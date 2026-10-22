@@ -9,6 +9,12 @@ It reports:
 - graph mode latency (decode-like)
 - fused availability (whether fused path returns non-None)
 - correctness (fused output matches split allreduce + rmsnorm reference)
+- with --arms: the same for aiter's fused kernel forced to 1-stage / 2-stage
+  (aiter_1stage, aiter_2stage) and for the pareto-comm communicator
+  (pareto_comm, built for the shapes' widths against the TP group's own
+  all-reduce path); "N/A" where an arm declines the shape
+- with --cold-l2: every timed call follows a write of 5x the L2 cache (each
+  call timed on its own)
 
 Usage example:
   torchrun --nproc_per_node=8 \
@@ -44,6 +50,11 @@ from sglang.srt.distributed.parallel_state import (
 from sglang.test.test_utils import publish_build_topology
 
 Shape = Tuple[int, int]
+ARMS = ("aiter_1stage", "aiter_2stage", "pareto_comm")
+# --cold-l2: written before every timed call (5x the L2 cache)
+_FLUSH: List[Optional[torch.Tensor]] = [None]
+# --arms pareto_comm: the communicator (built in main)
+_PUSH: List[object] = [None]
 
 
 def parse_shapes(raw: str) -> List[Shape]:
@@ -105,7 +116,8 @@ def _measure_us(
     end_event = torch.cuda.Event(enable_timing=True)
     samples_us: List[float] = []
 
-    for _ in range(max(1, repeats)):
+    flush = _FLUSH[0]
+    for _ in range(max(1, repeats) if flush is None else 0):
         _barrier(device)
         torch.cuda.synchronize()
         start_event.record()
@@ -114,6 +126,17 @@ def _measure_us(
         end_event.record()
         end_event.synchronize()
         samples_us.append(start_event.elapsed_time(end_event) * 1000.0 / iters)
+    for _ in range(max(1, repeats) if flush is not None else 0):
+        per_call = []
+        for _ in range(iters):
+            flush.zero_()
+            _barrier(device)
+            start_event.record()
+            fn()
+            end_event.record()
+            end_event.synchronize()
+            per_call.append(start_event.elapsed_time(end_event) * 1000.0)
+        samples_us.append(float(statistics.median(per_call)))
 
     sorted_samples = sorted(samples_us)
     p50 = float(statistics.median(sorted_samples))
@@ -311,6 +334,59 @@ def bench_graph(
     }
 
 
+def _arm_fn(arm: str, x, residual, weight, eps):
+    """The call of one --arms arm, or None when the arm declines the shape."""
+    if arm == "pareto_comm":
+        comm = _PUSH[0]
+        if (
+            comm is None
+            or comm.fused_allreduce_rmsnorm(x, residual, weight, eps) is None
+        ):
+            return None
+        return lambda: comm.fused_allreduce_rmsnorm(x, residual, weight, eps)
+    from sglang.srt.distributed.parallel_state import get_tp_group
+
+    ca = get_tp_group().ca_comm
+    one = arm == "aiter_1stage"
+    # the 1-stage kernel launches one block per token, at most 80
+    if ca is None or ca.disabled or (one and x.shape[0] > 80):
+        return None
+    if ca.custom_fused_ar_rms(x, residual, weight, eps, one) is None:
+        return None
+    return lambda: ca.custom_fused_ar_rms(x, residual, weight, eps, one)
+
+
+def bench_arm(arm, x, residual, weight, eps, graph, warmup, iters, repeats):
+    """(p50 us or None, correctness ok) of one --arms arm."""
+    available = _all_true_across_ranks(
+        _arm_fn(arm, x.clone(), residual.clone(), weight, eps) is not None, x.device
+    )
+    if not available:
+        return None, True
+    ax, ares = x.clone(), residual.clone()
+    # _arm_fn runs the arm once to see whether it serves the shape: outside the
+    # graph, so that the graph holds exactly one call
+    fn = _arm_fn(arm, ax, ares, weight, eps)
+    if graph:
+        with graph_capture() as gc:
+            g = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(g, stream=gc.stream):
+                out, res_out = fn()
+        fn = g.replay
+    us, _ = _measure_us(fn, warmup, iters, repeats, x.device)
+    if graph:
+        g.replay()
+        torch.cuda.synchronize()
+    else:
+        out, res_out = _arm_fn(arm, x.clone(), residual.clone(), weight, eps)()
+    ref_out, ref_residual = _split_reference(x, residual, weight, eps)
+    ok = (
+        check_close(out, ref_out, x.dtype)[0]
+        and check_close(res_out, ref_residual, x.dtype)[0]
+    )
+    return us, ok
+
+
 def _shape_bytes(shape: Shape, dtype: torch.dtype) -> int:
     m, n = shape
     return m * n * torch.tensor([], dtype=dtype).element_size()
@@ -357,6 +433,17 @@ def parse_args():
         choices=["eager", "graph", "both"],
     )
     parser.add_argument(
+        "--arms",
+        type=str,
+        default="",
+        help=f"Comma-separated extra arms: {', '.join(ARMS)}.",
+    )
+    parser.add_argument(
+        "--cold-l2",
+        action="store_true",
+        help="Write 5x the L2 cache before every timed call.",
+    )
+    parser.add_argument(
         "--csv-out",
         type=str,
         default=None,
@@ -387,6 +474,31 @@ def main():
 
     prefill_shapes = parse_shapes(args.prefill_shapes)
     decode_shapes = parse_shapes(args.decode_shapes)
+    arms = [a for a in args.arms.split(",") if a]
+    for a in arms:
+        if a not in ARMS:
+            raise ValueError(f"unknown arm {a!r} (known: {', '.join(ARMS)})")
+    if args.cold_l2:
+        l2 = torch.cuda.get_device_properties(device).L2_cache_size
+        _FLUSH[0] = torch.empty(5 * l2, dtype=torch.uint8, device=device)
+    if "pareto_comm" in arms:
+        from sglang.srt.distributed.device_communicators.pareto_comm import (
+            ParetoCommunicator,
+        )
+        from sglang.srt.distributed.device_communicators.pareto_comm_setup import (
+            stock_profile_of,
+        )
+        from sglang.srt.distributed.parallel_state import get_tp_group
+
+        tp = get_tp_group()
+        _PUSH[0] = ParetoCommunicator(
+            tp.cpu_group,
+            device,
+            max_bytes=0,
+            stock_profile=stock_profile_of(tp),
+            hidden_sizes=sorted({n for _, n in prefill_shapes + decode_shapes}),
+            fused_max_tokens=max(m for m, _ in prefill_shapes + decode_shapes),
+        )
 
     if rank == 0:
         print(
@@ -410,9 +522,11 @@ def main():
             print(f"Mode: {phase_name}")
             print(
                 "| Shape | Input bytes/rank | Split p50 (us) | Fused p50 (us) | Speedup | Fused available | Correctness |"
+                + "".join(f" {a} p50 (us) |" for a in arms)
             )
             print(
                 "|:------|-----------------:|---------------:|---------------:|--------:|:----------------|:------------|"
+                + "------------:|" * len(arms)
             )
 
         for shape in shapes:
@@ -446,6 +560,29 @@ def main():
                     repeats=args.repeats,
                 )
 
+            arm_res = {
+                a: bench_arm(
+                    a,
+                    x,
+                    residual,
+                    weight,
+                    args.eps,
+                    mode == "graph",
+                    args.warmup,
+                    args.iters,
+                    args.repeats,
+                )
+                for a in arms
+            }
+            arm_text = {}
+            for a, (us, ok) in arm_res.items():
+                ok = _all_true_across_ranks(ok, device)
+                arm_text[a] = (
+                    "N/A"
+                    if us is None
+                    else f"{_mean_across_ranks(us, device):.1f}"
+                    + ("" if ok else " (FAIL)")
+                )
             split_us = _mean_across_ranks(float(metrics["split_us"]), device)
             fused_available = _all_true_across_ranks(
                 bool(metrics["fused_available"]), device
@@ -475,6 +612,7 @@ def main():
                 print(
                     f"| {shape_str} | {bytes_per_rank} | {split_us:.1f} | {fused_str} | "
                     f"{speedup_str} | {str(fused_available)} | {correctness_text} |"
+                    + "".join(f" {arm_text[a]} |" for a in arms)
                 )
                 csv_rows.append(
                     {
@@ -499,6 +637,8 @@ def main():
                         "warmup": args.warmup,
                         "iters": args.iters,
                         "repeats": args.repeats,
+                        "cold_l2": args.cold_l2,
+                        **{f"{a}_p50_us": arm_text[a] for a in arms},
                     }
                 )
 
@@ -522,7 +662,8 @@ def main():
             "warmup",
             "iters",
             "repeats",
-        ]
+            "cold_l2",
+        ] + [f"{a}_p50_us" for a in arms]
         with open(args.csv_out, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
@@ -530,6 +671,8 @@ def main():
         print(f"\nSaved CSV to: {args.csv_out}")
 
     _barrier(device)
+    if _PUSH[0] is not None:
+        _PUSH[0].close()
     destroy_model_parallel()
     destroy_distributed_environment()
 

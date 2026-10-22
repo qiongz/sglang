@@ -1,7 +1,9 @@
 """Multi-GPU correctness of pareto-comm (gfx950, Triton 3.7): lossless kernels
 bitwise against the fp32 rank-order sum (modulo the sign of zero) and identical
 on every rank, the xe8 wire against its reference and QuickReduce INT8, CUDA
-graphs, refusals, counter wrap, failure handling, streams, IPC memory."""
+graphs, refusals, counter wrap, failure handling, streams, IPC memory; the
+fused all-reduce + residual add + RMSNorm (residual output bitwise, output
+within 1 ulp of the fp32 RMSNorm, the same with the monitor and call tags)."""
 
 import json
 import multiprocessing
@@ -890,6 +892,190 @@ def _plain(rank, world, device, group):
         comm.close()
 
 
+def _test_fused_table(world):
+    """The plain test table + fused plans for every capability class:
+    one_shot up to 64 KiB where it can run, two_shot to 4 MiB, the stock path
+    to 8 MiB, then two_shot_epoch (persistent, pipelined finisher) where it can
+    run, else two_shot, to 32 MiB."""
+    t = _test_bytes_table(world)
+
+    def segs(*rows):
+        out, lo = [], 0
+        for hi, head in rows:
+            out.append(dict(lo=lo, hi=hi, head=head, bound="test", why="test"))
+            lo = hi
+        return out
+
+    t["fused"] = {
+        "ADD_RMS": dict(
+            profile="qr_off",
+            floor="bf16",
+            plans={
+                "two_shot": segs(
+                    (4 * MIB, "two"), (8 * MIB, "stock"), (32 * MIB, "two")
+                ),
+                "one_shot+two_shot": segs(
+                    (64 << 10, "one"),
+                    (4 * MIB, "two"),
+                    (8 * MIB, "stock"),
+                    (32 * MIB, "two"),
+                ),
+                "two_shot+two_shot_epoch": segs(
+                    (4 * MIB, "two"), (8 * MIB, "stock"), (32 * MIB, "epoch")
+                ),
+                "one_shot+two_shot+two_shot_epoch": segs(
+                    (64 << 10, "one"),
+                    (4 * MIB, "two"),
+                    (8 * MIB, "stock"),
+                    (32 * MIB, "epoch"),
+                ),
+            },
+        )
+    }
+    return t
+
+
+def _fused_inputs(case, world, m, h, device):
+    xs = _inputs(case, world, (m, h), device)
+    g = torch.Generator(device=device).manual_seed(77 + case)
+    res = (torch.randn(m, h, device=device, generator=g)).to(torch.bfloat16)
+    res.view(-1)[:4] = -0.0
+    w = (1 + 0.1 * torch.randn(h, device=device, generator=g)).to(torch.bfloat16)
+    return xs, res, w
+
+
+def _ref_fused(xs, res, w, eps):
+    s = _ref_all_reduce(xs).float() + res.float()
+    out = s * torch.rsqrt(s.pow(2).mean(-1, keepdim=True) + eps) * w.float()
+    return out.to(torch.bfloat16), s.to(torch.bfloat16)
+
+
+def _ulp(got, want):
+    g, w = got.float(), want.float()
+    e = torch.floor(torch.log2(w.abs().clamp_min(1e-30)))
+    d = (g - w).abs() / torch.pow(2.0, e - 7)
+    big = w.abs() > 1e-3 * w.abs().amax(-1, keepdim=True)
+    return float((d * big).max()) if g.numel() else 0.0
+
+
+def _check_fused(comm, case, m, h, rank, world, device, group, site=0):
+    eps = 1e-6
+    xs, res, w = _fused_inputs(case, world, m, h, device)
+    r = comm.fused_allreduce_rmsnorm(xs[rank], res, w, eps, site=site)
+    assert r is not None, f"fused [{m}, {h}]: not served"
+    out, res_out = r
+    want_out, want_res = _ref_fused(xs, res, w, eps)
+    assert _same_bits(res_out, want_res), f"fused [{m}, {h}]: residual differs"
+    assert _ulp(out, want_out) <= 1.0, (
+        f"fused [{m}, {h}]: out {_ulp(out, want_out)} ulp"
+    )
+    assert _same_everywhere(out, group) and _same_everywhere(res_out, group)
+
+
+def _fused_ms(comm, h):
+    out = []
+    for lo, hi, _ in comm.fused.sel.get(h, ()):
+        out += sorted({lo, hi, (lo + hi) // 2 | 1})
+    return out
+
+
+def _fused(rank, world, device, group, monitor=False):
+    import random
+
+    from sglang.srt.distributed.device_communicators.pareto_comm import (
+        ParetoCommunicator,
+    )
+
+    widths = (6144, 4096, 7168) if world > 2 else (6144, 4096)
+    comm = ParetoCommunicator(
+        group,
+        device,
+        max_bytes=8 * MIB,
+        segments_table=_test_fused_table(world),
+        hidden_sizes=widths,
+        monitor=monitor,
+        seq_check=monitor,
+        on_fatal=(lambda info: None) if monitor else None,
+    )
+    try:
+        assert comm.fused is not None and sorted(comm.fused.sel) == sorted(widths)
+        case = 0
+        for h in widths:
+            for m in _fused_ms(comm, h):
+                case += 1
+                _check_fused(comm, 2000 + case, m, h, rank, world, device, group, case)
+        # one CUDA graph of several fused calls, replayed with new inputs
+        h = widths[0]
+        ms = _fused_ms(comm, h)[:: max(1, len(_fused_ms(comm, h)) // 4)][:4]
+        bufs = [_fused_inputs(3000 + i, world, m, h, device) for i, m in enumerate(ms)]
+        xs_in = [b[0][rank].clone() for b in bufs]
+        s = torch.cuda.Stream()
+        s.wait_stream(torch.cuda.current_stream())
+        g = torch.cuda.CUDAGraph()
+        with torch.cuda.stream(s), torch.cuda.graph(g, stream=s):
+            outs = [
+                comm.fused_allreduce_rmsnorm(x, b[1], b[2], 1e-6)
+                for x, b in zip(xs_in, bufs)
+            ]
+        for rep in range(3):
+            refs = []
+            for i, (m, b) in enumerate(zip(ms, bufs)):
+                xs, res, w = _fused_inputs(3100 + 10 * rep + i, world, m, h, device)
+                xs_in[i].copy_(xs[rank])
+                b[1].copy_(res)
+                b[2].copy_(w)
+                refs.append(_ref_fused(xs, res, w, 1e-6))
+            g.replay()
+            torch.cuda.synchronize()
+            for (o, r), (wo, wr) in zip(outs, refs):
+                assert _same_bits(r, wr) and _ulp(o, wo) <= 1.0, "graph replay"
+        del g
+        # a rotating late rank
+        for i, m in enumerate(_fused_ms(comm, h)[:6]):
+            if rank == i % world:
+                torch.cuda._sleep(200_000)
+            _check_fused(comm, 3500 + i, m, h, rank, world, device, group)
+        # plain and fused calls interleaved at random (one seed on every rank)
+        rnd = random.Random(7)
+        for i in range(60):
+            hh = rnd.choice(widths)
+            m = rnd.choice(_fused_ms(comm, hh))
+            if rnd.random() < 0.5:
+                _check(
+                    comm,
+                    4000 + i,
+                    rnd.choice([100, 4097, 30000]),
+                    rank,
+                    world,
+                    device,
+                    group,
+                )
+            else:
+                _check_fused(comm, 4000 + i, m, hh, rank, world, device, group)
+        # refusals: no launch, no counter touched
+        before = comm.ws.ctr_page.clone()
+        x = torch.zeros(4, h, dtype=torch.bfloat16, device=device)
+        w = torch.ones(h, dtype=torch.bfloat16, device=device)
+        top = max(hi for _, hi, _ in comm.fused.sel[h])
+        big = torch.zeros(top + 1, h, dtype=torch.bfloat16, device=device)
+        assert comm.fused_allreduce_rmsnorm(big, big, w, 1e-6) is None
+        assert comm.fused_allreduce_rmsnorm(x, x.float(), w, 1e-6) is None
+        x2 = torch.zeros(4, 2560, dtype=torch.bfloat16, device=device)
+        assert comm.fused_allreduce_rmsnorm(x2, x2, w[:2560], 1e-6) is None
+        stock_m = (6 * MIB) // (2 * h)
+        xs_ = torch.zeros(stock_m, h, dtype=torch.bfloat16, device=device)
+        assert comm.fused_allreduce_rmsnorm(xs_, xs_, w, 1e-6) is None
+        torch.cuda.synchronize()
+        assert torch.equal(before, comm.ws.ctr_page)
+        assert comm.check() == 0
+    finally:
+        comm.close()
+
+
+def _fused_monitor(rank, world, device, group):
+    _fused(rank, world, device, group, monitor=True)
+
+
 def _qr_int8(group, device, level="INT8"):
     """sglang's QuickReduce at a quantized level (None where it is not
     available)."""
@@ -1041,6 +1227,8 @@ def _worker(rank, world, port, mode, q):
             "streams": _streams,
             "pressure": _pressure,
             "ipc": _ipc,
+            "fused": _fused,
+            "fused_monitor": _fused_monitor,
         }[mode](rank, world, device, group)
         q.put((rank, None))
     except Exception:
@@ -1105,6 +1293,8 @@ for _mode, _worlds in (
     ("ipc", (2, 4, 8)),
     ("plain", (4,)),
     ("int8", (2, 4, 8)),
+    ("fused", (2, 4, 8)),
+    ("fused_monitor", (4,)),
 ):
     for _w in _worlds:
         setattr(TestParetoCommAllReduce, f"test_{_mode}_tp{_w}", _case(_w, _mode))
