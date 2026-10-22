@@ -917,3 +917,230 @@ def test_plain_binds_once_per_size():
     assert torch.equal(run(x), x + 1)
     assert calls == [(4096, False), (4096, False)]
     assert p._bind(torch.zeros(3_000_000, dtype=torch.bfloat16)) is None  # c12
+
+
+# ------------------------------------------------------- fused add + RMSNorm
+def _fused_table(world=4):
+    """_seg_table + fused plans per capability class: one_shot up to 64 KiB
+    where it can run, two_shot to 4 MiB, the stock path to 8 MiB, then
+    two_shot_epoch where it can run (else the stock path) to 64 MiB."""
+    t = _seg_table(world)
+
+    def segs(*rows):
+        out, lo = [], 0
+        for hi, head in rows:
+            out.append(dict(lo=lo, hi=hi, head=head, bound="x", why="test"))
+            lo = hi
+        return out
+
+    t["fused"] = {
+        "ADD_RMS": dict(
+            profile="qr_off",
+            floor="bf16",
+            plans={
+                "two_shot": segs((4 * MIB, "two"), (64 * MIB, "stock")),
+                "one_shot+two_shot": segs(
+                    (64 << 10, "one"), (4 * MIB, "two"), (64 * MIB, "stock")
+                ),
+                "two_shot+two_shot_epoch": segs(
+                    (4 * MIB, "two"), (8 * MIB, "stock"), (64 * MIB, "epoch")
+                ),
+                "one_shot+two_shot+two_shot_epoch": segs(
+                    (64 << 10, "one"),
+                    (4 * MIB, "two"),
+                    (8 * MIB, "stock"),
+                    (64 * MIB, "epoch"),
+                ),
+            },
+        )
+    }
+    return table.validate(t)
+
+
+def test_fused_capability():
+    assert table.fused_cap(6144, 4) == "one_shot+two_shot+two_shot_epoch"
+    assert table.fused_cap(6144, 8) == "two_shot+two_shot_epoch"  # 6 x 7 > 32
+    assert table.fused_cap(7168, 8) == "two_shot"  # 7168 % (8 x 256) != 0
+    assert table.fused_cap(2880, 8) is None  # not a multiple of 256
+    assert table.fused_cap(32768, 8) is None  # two_shot: H <= 16384
+    assert not table.fused_capable("two_shot_window", 8192, 8)  # plain only
+
+
+def test_fused_two_shot_f():
+    def legal(f):
+        return True
+
+    # keeps the measured chunks per finisher (width / 256 / F)
+    assert table.two_shot_f(6144, 8192, 4, legal) == 3
+    assert table.two_shot_f(8192, 8192, 4, legal) == 4
+    assert table.two_shot_f(7168, 4096, 4, legal) == 7
+    assert table.two_shot_f(6144, 8192, 4, lambda f: f != 3) == 4  # the next one
+    assert table.two_shot_f(6144, 8192, 4, lambda f: False) is None
+    im = dict(kind="two_shot", tier="exact", width=8192, geom=dict(F=4, NSEND=4))
+    assert table.fused_geom(im, 6144, lambda g: True) == dict(F=3, NSEND=4)
+    ep = dict(kind="two_shot_epoch", tier="exact", width=4096, geom=dict(f=8))
+    assert table.fused_geom(ep, 6144, lambda g: False) == dict(f=8)
+
+
+def test_fused_table_validation():
+    for mutate in (
+        lambda t: t["fused"].update(HC_POST=t["fused"]["ADD_RMS"]),
+        lambda t: t["fused"]["ADD_RMS"].update(profile="qr_int3"),
+        # a head of a kind the class cannot run
+        lambda t: t["fused"]["ADD_RMS"]["plans"]["two_shot"][0].update(head="one"),
+        lambda t: t["fused"]["ADD_RMS"]["plans"]["two_shot"][1].update(lo=5),
+    ):
+        bad = json.loads(json.dumps(_fused_table()))
+        mutate(bad)
+        with pytest.raises(ValueError):
+            table.validate(bad)
+    bad = json.loads(json.dumps(_fused_table()))
+    bad["impls"]["two"]["tier"] = "int8"  # a lossy head
+    with pytest.raises(ValueError):
+        table.validate(bad)
+
+
+def test_fused_segments_and_profiles():
+    t = _fused_table()
+
+    def heads(profile, h=6144):
+        return [
+            (s["lo"], s["hi"], s["name"]) for s in table.fused_segments(t, profile, h)
+        ]
+
+    assert heads(None) == [
+        (0, 64 << 10, "one"),
+        (64 << 10, 4 * MIB, "two"),
+        (4 * MIB, 8 * MIB, "stock"),
+        (8 * MIB, 64 * MIB, "epoch"),
+    ]
+    # TP4 H 11520: two_shot only (64-column blocks)
+    assert table.fused_cap(11520, 4) == "two_shot"
+    assert heads(None, 11520) == [(0, 4 * MIB, "two"), (4 * MIB, 64 * MIB, "stock")]
+    assert table.fused_segments(t, None, 2880) == []
+    assert table.fused_segments(t, None, 6144, epi="ADD") == []
+    # QuickReduce INT8 from 2 MiB, ahead of the custom all-reduce: every size
+    # it serves is refused (the plans were not measured against it)
+    q = table.StockProfile(
+        qr_level="INT8", qr_min=2 * MIB, qr_max=2 << 30, qr_first=True
+    )
+    assert heads(q) == [
+        (0, 64 << 10, "one"),
+        (64 << 10, 2 * MIB - 1, "two"),
+        (2 * MIB - 1, 64 * MIB, "stock"),
+    ]
+    # behind the custom all-reduce QuickReduce runs only above its 64 MiB
+    q = table.StockProfile(qr_level="INT8", qr_min=2 * MIB, qr_max=2 << 30)
+    assert heads(q) == heads(None)
+    # a lower custom all-reduce limit: the sizes above it are refused
+    c = table.StockProfile(ca_max=16 * MIB)
+    assert heads(c)[-1] == (16 * MIB, 64 * MIB, "stock")
+
+
+class _NormInst(SimpleNamespace):
+    def ar_add_rmsnorm(self, x, res, w, eps):
+        self.calls.append((self.kind, tuple(x.shape), eps))
+        return x + 1, res + 1
+
+
+def _fused(world=4, hidden=(6144, 11520), max_tokens=32768, can_norm=True):
+    f = R._FusedAR(world, _fused_table(world), None, hidden, max_tokens, False)
+    calls = []
+    for sp in f.specs:
+        sp.inst = _NormInst(kind=sp.kind, can_norm=can_norm, calls=calls)
+    return f, calls
+
+
+def test_fused_selection_by_bytes():
+    f, _ = _fused()
+
+    def kind(m, h=6144):
+        x = torch.zeros(m, h, dtype=torch.bfloat16)
+        r = torch.zeros(m, h, dtype=torch.bfloat16)
+        p = f.pick(x, r, torch.ones(h, dtype=torch.bfloat16))
+        return None if p is None else p.kind
+
+    rb = 2 * 6144
+    assert kind(1) == "one_shot"
+    assert kind((64 << 10) // rb) == "one_shot"
+    assert kind((64 << 10) // rb + 1) == "two_shot"
+    assert kind((4 * MIB) // rb) == "two_shot"
+    assert kind((4 * MIB) // rb + 1) is None  # the stock path
+    assert kind((8 * MIB) // rb + 1) == "two_shot_epoch"
+    assert kind((64 * MIB) // rb) == "two_shot_epoch"
+    assert kind((64 * MIB) // rb + 1) is None  # above the plans
+    assert kind(1, 11520) == "two_shot"
+    assert kind((4 * MIB) // (2 * 11520) + 1, 11520) is None
+    # one instance per (kernel, H, geometry); two_shot keeps the measured
+    # chunks per finisher (4096 / 256 / F 4 = 4): F = 6 at H 6144
+    tw = [sp for sp in f.specs if sp.kind == "two_shot" and sp.hidden == 6144]
+    assert len(tw) == 1 and tw[0].geom["F"] == 6
+    assert tw[0].rows == (4 * MIB) // rb and tw[0].m0 == (64 << 10) // rb + 1
+    assert all(sp.norm for sp in f.specs)
+
+
+def test_fused_refusals():
+    f, _ = _fused()
+    h = 6144
+    x = torch.zeros(4, h, dtype=torch.bfloat16)
+    r = torch.zeros(4, h, dtype=torch.bfloat16)
+    w = torch.ones(h, dtype=torch.bfloat16)
+    assert f.pick(x, r, w) is not None
+    assert f.pick(x.float(), r, w) is None
+    assert f.pick(x, r.float(), w) is None
+    assert f.pick(x, r[:2], w) is None
+    assert f.pick(x, r, w[:-1]) is None
+    assert f.pick(torch.zeros(4, 4096, dtype=torch.bfloat16), r, w) is None  # H
+    assert f.pick(torch.zeros(8, h, dtype=torch.bfloat16)[::2], r, w) is None
+    assert f.pick(torch.zeros(0, h, dtype=torch.bfloat16), r[:0], w) is None
+    assert f.serves(4, h) and not f.serves(4, 4096)
+    # a kernel that cannot run the norm with the build's options: refused
+    g, _ = _fused(can_norm=False)
+    assert g.pick(x, r, w) is None and not g.serves(4, h)
+    # max_tokens caps the plans
+    g, _ = _fused(max_tokens=16)
+    assert g.serves(16, h) and not g.serves(17, h)
+
+
+def test_fused_call_and_guards(monkeypatch):
+    comm, st = _guarded(monkeypatch, "serial")
+    f, calls = _fused()
+    comm.fused = f
+    st.cur = _Stream("A", st.waits)
+    h = 6144
+    x = torch.zeros(4, h, dtype=torch.bfloat16)
+    r = torch.zeros(4, h, dtype=torch.bfloat16)
+    w = torch.ones(h, dtype=torch.bfloat16)
+    assert comm.should_fuse(x)
+    out, res_out = comm.fused_allreduce_rmsnorm(x, r, w, 1e-5, site=3)
+    assert torch.equal(out, x + 1) and torch.equal(res_out, r + 1)
+    assert calls == [("one_shot", (4, h), 1e-5)] and comm.site_box[0] == 3
+    with comm._lock:  # another thread is inside a call: refused, no launch
+        assert not comm.should_fuse(x)
+        assert comm.fused_allreduce_rmsnorm(x, r, w, 1e-5) is None
+    assert len(calls) == 1
+    assert comm.fused_allreduce_rmsnorm(x, r.float(), w, 1e-5) is None
+    comm.fused = None
+    assert not comm.should_fuse(x)
+    assert comm.fused_allreduce_rmsnorm(x, r, w, 1e-5) is None
+    comm.disabled = True
+    comm.fused = f
+    assert comm.fused_allreduce_rmsnorm(x, r, w, 1e-5) is None
+
+
+def test_fused_ipc_budget():
+    """plain + fused instances of the shipped tables (fused plans where they
+    ship, else the synthetic ones) for H 6144: one instance <= 256 MiB, all <=
+    1 GiB per rank, with the call tags"""
+    for tp in (2, 4, 8):
+        t = table.load_segments(ARCH, tp, TC)
+        if not t.get("fused"):
+            ft = _fused_table(tp)
+            t = dict(t, fused=ft["fused"], impls=dict(t["impls"], **ft["impls"]))
+        specs = R._PlainAR(tp, 512 * MIB, t).specs
+        specs += R._FusedAR(tp, t, None, (6144,), 32768, True).specs
+        sizes = [
+            R._sizes(sp.kind, tp, sp.hidden, sp.rows, sp.geom, True)[0] for sp in specs
+        ]
+        assert max(sizes) <= (256 + 8) * MIB, (tp, max(sizes) / MIB)
+        assert sum(sizes) <= 1024 * MIB, (tp, sum(sizes) / MIB)
