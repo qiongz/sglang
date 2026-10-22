@@ -1,0 +1,284 @@
+{
+  "kind": "ar_segments",
+  "arch": "gfx950",
+  "tp": 2,
+  "toolchain": "triton-3.7.0",
+  "impls": {
+    "two_shot_w2048_f1": {"kind": "two_shot", "tier": "exact", "width": 2048, "geom": {"F": 1, "NSEND": 2, "RA": 1, "NSLOT": 3, "PIPE": 1}, "bound": "request_transaction"},
+    "two_shot_w2048_f2_stagger10g8": {"kind": "two_shot", "tier": "exact", "width": 2048, "geom": {"F": 2, "NSEND": 2, "RA": 1, "NSLOT": 3, "PIPE": 1, "SDLY": 10, "SDG": 8}, "bound": "request_transaction"},
+    "two_shot_w4096_f8": {"kind": "two_shot", "tier": "exact", "width": 4096, "geom": {"F": 8, "NSEND": 2, "RA": 1, "NSLOT": 3, "PIPE": 1}, "bound": "request_transaction"},
+    "two_shot_epoch_c12_w4096_win1024": {"kind": "two_shot_epoch", "tier": "exact", "width": 4096, "geom": {"window": 1024, "ldspad": 0, "f": 8}, "bound": "bandwidth"},
+    "two_shot_epoch_c12_w4096": {"kind": "two_shot_epoch", "tier": "exact", "width": 4096, "geom": {"window": 2048, "ldspad": 0, "f": 8}, "bound": "bandwidth"},
+    "two_shot_epoch_c12_w4096_persistent": {"kind": "two_shot_epoch", "tier": "exact", "width": 4096, "geom": {"wire": "c12", "window": 2048, "f": 8, "npc": 24, "xs": 2}, "bound": "occupancy"},
+    "two_shot_window_w2048": {"kind": "two_shot_window", "tier": "exact", "width": 2048, "geom": {}, "bound": "bandwidth"},
+    "one_shot_w1024": {"kind": "one_shot", "tier": "exact", "width": 1024, "geom": {"NSEND": 8}, "bound": "launch_latency"},
+    "one_shot_w512": {"kind": "one_shot", "tier": "exact", "width": 512, "geom": {"NSEND": 8}, "bound": "launch_latency"}
+  },
+  "profiles": {
+    "qr_off": {"qr_level": null, "qr_min": 0, "qr_max": 0, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_fp": {"qr_level": "FP", "qr_min": 1048576, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int8": {"qr_level": "INT8", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int6": {"qr_level": "INT6", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int4": {"qr_level": "INT4", "qr_min": 1048576, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_fp_bf16": {"qr_level": "FP", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int8_bf16": {"qr_level": "INT8", "qr_min": 8388608, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int6_bf16": {"qr_level": "INT6", "qr_min": 8388608, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int4_bf16": {"qr_level": "INT4", "qr_min": 8388608, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_fp_qf": {"qr_level": "FP", "qr_min": 1048576, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int8_qf": {"qr_level": "INT8", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int6_qf": {"qr_level": "INT6", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int4_qf": {"qr_level": "INT4", "qr_min": 1048576, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_fp_bf16_qf": {"qr_level": "FP", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int8_bf16_qf": {"qr_level": "INT8", "qr_min": 8388608, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int6_bf16_qf": {"qr_level": "INT6", "qr_min": 8388608, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int4_bf16_qf": {"qr_level": "INT4", "qr_min": 8388608, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true}
+  },
+  "plans": {
+    "qr_off/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 5242880, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8783, "tol": 0.02, "n": 17, "n_measured": 17, "why": "bound regime change"},
+      {"lo": 5242880, "hi": 11272192, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca", "bound": "occupancy", "worst": 0.8968, "median": 0.8751, "tol": 0.02, "n": 23, "n_measured": 23, "why": "bound regime change"},
+      {"lo": 11272192, "hi": 536870912, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 0.9736, "median": 0.8526, "tol": 0.02, "n": 161, "n_measured": 161, "why": "bound regime change"}
+    ],
+    "qr_off/aligned": [
+      {"lo": 0, "hi": 8176, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9218, "median": 0.8573, "tol": 0.05, "n": 17, "n_measured": 17, "why": "push at parity with the stock path"},
+      {"lo": 8176, "hi": 65520, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8206, "median": 0.7759, "tol": 0.0483, "n": 8, "n_measured": 8, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65520, "hi": 524272, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9504, "median": 0.8433, "tol": 0.0384, "n": 11, "n_measured": 11, "why": "bound regime change"},
+      {"lo": 524272, "hi": 1048560, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9177, "median": 0.9079, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"}
+    ],
+    "qr_off/unaligned": [
+      {"lo": 0, "hi": 8190, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.3711, "median": 0.3436, "tol": 0.05, "n": 233, "n_measured": 233, "why": "push at parity with the stock path"},
+      {"lo": 8190, "hi": 65534, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.3793, "median": 0.3268, "tol": 0.0483, "n": 103, "n_measured": 103, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65534, "hi": 429614, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.583, "median": 0.4255, "tol": 0.0384, "n": 103, "n_measured": 103, "why": "bound regime change"},
+      {"lo": 429614, "hi": 977144, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.7189, "median": 0.707, "tol": 0.02, "n": 51, "n_measured": 8, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 977144, "hi": 1355590, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.8055, "median": 0.7615, "tol": 0.02, "n": 41, "n_measured": 25, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1355590, "hi": 1358294, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9262, "median": 0.9262, "tol": 0.02, "n": 1, "n_measured": 1, "why": "bound regime change"},
+      {"lo": 1358294, "hi": 1359064, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.8319, "median": 0.8319, "tol": 0.02, "n": 1, "n_measured": 1, "why": "bound regime change"},
+      {"lo": 1359064, "hi": 1581054, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.8299, "median": 0.8236, "tol": 0.02, "n": 23, "n_measured": 7, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1581054, "hi": 1744380, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9125, "median": 0.9045, "tol": 0.02, "n": 13, "n_measured": 13, "why": "bound regime change"},
+      {"lo": 1744380, "hi": 1770562, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.8857, "median": 0.8857, "tol": 0.02, "n": 2, "n_measured": 2, "why": "bound regime change"},
+      {"lo": 1770562, "hi": 2028344, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9049, "median": 0.8952, "tol": 0.02, "n": 20, "n_measured": 20, "why": "bound regime change"},
+      {"lo": 2028344, "hi": 2093990, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9111, "median": 0.9111, "tol": 0.02, "n": 1, "n_measured": 1, "why": "bound regime change"},
+      {"lo": 2093990, "hi": 2352300, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.8801, "median": 0.8709, "tol": 0.02, "n": 10, "n_measured": 10, "why": "bound regime change"},
+      {"lo": 2352300, "hi": 2428812, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9266, "median": 0.9266, "tol": 0.02, "n": 1, "n_measured": 1, "why": "bound regime change"},
+      {"lo": 2428812, "hi": 2495896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.8557, "median": 0.8476, "tol": 0.02, "n": 3, "n_measured": 3, "why": "bound regime change"},
+      {"lo": 2495896, "hi": 2537134, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9293, "median": 0.9293, "tol": 0.02, "n": 1, "n_measured": 1, "why": "bound regime change"},
+      {"lo": 2537134, "hi": 536870910, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9303, "median": 0.8577, "tol": 0.02, "n": 383, "n_measured": 383, "why": "bound regime change"}
+    ],
+    "qr_off/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 10485776, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9674, "tol": 0.02, "n": 7, "n_measured": 5, "why": "push at parity with the stock path"},
+      {"lo": 10485776, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 0.9187, "median": 0.8805, "tol": 0.02, "n": 68, "n_measured": 53, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"}
+    ],
+    "qr_fp/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 5242880, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8783, "tol": 0.02, "n": 17, "n_measured": 17, "why": "bound regime change"},
+      {"lo": 5242880, "hi": 67108864, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca", "bound": "occupancy", "worst": 0.8968, "median": 0.8504, "tol": 0.02, "n": 124, "n_measured": 124, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.7939, "median": 0.7939, "tol": 0.02, "n": 2, "n_measured": 2, "why": "bound regime change"}
+    ],
+    "qr_fp/aligned": "qr_off/aligned",
+    "qr_fp/unaligned": "qr_off/unaligned",
+    "qr_fp/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 10485776, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9674, "tol": 0.02, "n": 7, "n_measured": 5, "why": "push at parity with the stock path"},
+      {"lo": 10485776, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.9187, "median": 0.893, "tol": 0.02, "n": 68, "n_measured": 53, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"}
+    ],
+    "qr_int8/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 5242880, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8783, "tol": 0.02, "n": 17, "n_measured": 17, "why": "bound regime change"},
+      {"lo": 5242880, "hi": 67108864, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca", "bound": "occupancy", "worst": 0.8968, "median": 0.8504, "tol": 0.02, "n": 124, "n_measured": 124, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 29, "n_measured": 29, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int8/aligned": "qr_off/aligned",
+    "qr_int8/unaligned": "qr_off/unaligned",
+    "qr_int8/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 10485776, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9674, "tol": 0.02, "n": 7, "n_measured": 5, "why": "push at parity with the stock path"},
+      {"lo": 10485776, "hi": 67108848, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9187, "median": 0.893, "tol": 0.02, "n": 45, "n_measured": 30, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"},
+      {"lo": 67108848, "hi": 536870896, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 14, "n_measured": 14, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int6/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 5242880, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8783, "tol": 0.02, "n": 17, "n_measured": 17, "why": "bound regime change"},
+      {"lo": 5242880, "hi": 67108864, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca", "bound": "occupancy", "worst": 0.8968, "median": 0.8504, "tol": 0.02, "n": 124, "n_measured": 124, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int6/aligned": "qr_off/aligned",
+    "qr_int6/unaligned": "qr_off/unaligned",
+    "qr_int6/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 10485776, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9674, "tol": 0.02, "n": 7, "n_measured": 5, "why": "push at parity with the stock path"},
+      {"lo": 10485776, "hi": 67108848, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9187, "median": 0.893, "tol": 0.02, "n": 45, "n_measured": 30, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"},
+      {"lo": 67108848, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 23, "n_measured": 23, "why": "sustained gain over two_shot_epoch_c12_w4096 (>= 3% on >= 3 points)"}
+    ],
+    "qr_int4/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 5242880, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8783, "tol": 0.02, "n": 17, "n_measured": 17, "why": "bound regime change"},
+      {"lo": 5242880, "hi": 67108864, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca", "bound": "occupancy", "worst": 0.8968, "median": 0.8504, "tol": 0.02, "n": 124, "n_measured": 124, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int4/aligned": "qr_off/aligned",
+    "qr_int4/unaligned": "qr_off/unaligned",
+    "qr_int4/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 10485776, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9674, "tol": 0.02, "n": 7, "n_measured": 5, "why": "push at parity with the stock path"},
+      {"lo": 10485776, "hi": 67108848, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9187, "median": 0.893, "tol": 0.02, "n": 45, "n_measured": 30, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"},
+      {"lo": 67108848, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 23, "n_measured": 23, "why": "sustained gain over two_shot_epoch_c12_w4096 (>= 3% on >= 3 points)"}
+    ],
+    "qr_fp_bf16/fast": "qr_fp/fast",
+    "qr_fp_bf16/aligned": "qr_off/aligned",
+    "qr_fp_bf16/unaligned": "qr_off/unaligned",
+    "qr_fp_bf16/padded": "qr_fp/padded",
+    "qr_int8_bf16/fast": "qr_int8/fast",
+    "qr_int8_bf16/aligned": "qr_off/aligned",
+    "qr_int8_bf16/unaligned": "qr_off/unaligned",
+    "qr_int8_bf16/padded": "qr_int8/padded",
+    "qr_int6_bf16/fast": "qr_int6/fast",
+    "qr_int6_bf16/aligned": "qr_off/aligned",
+    "qr_int6_bf16/unaligned": "qr_off/unaligned",
+    "qr_int6_bf16/padded": "qr_int6/padded",
+    "qr_int4_bf16/fast": "qr_int4/fast",
+    "qr_int4_bf16/aligned": "qr_off/aligned",
+    "qr_int4_bf16/unaligned": "qr_off/unaligned",
+    "qr_int4_bf16/padded": "qr_int4/padded",
+    "qr_fp_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 536870912, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.7939, "median": 0.7939, "tol": 0.02, "n": 2, "n_measured": 2, "why": "bound regime change"}
+    ],
+    "qr_fp_qf/aligned": "qr_off/aligned",
+    "qr_fp_qf/unaligned": "qr_off/unaligned",
+    "qr_fp_qf/padded": [
+      {"lo": 0, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 90, "n_measured": 71, "why": "push at parity with the stock path"}
+    ],
+    "qr_int8_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 1835008, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8719, "median": 0.8718, "tol": 0.02, "n": 4, "n_measured": 4, "why": "bound regime change"},
+      {"lo": 1835008, "hi": 536870912, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 29, "n_measured": 29, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int8_qf/aligned": "qr_off/aligned",
+    "qr_int8_qf/unaligned": "qr_off/unaligned",
+    "qr_int8_qf/padded": [
+      {"lo": 0, "hi": 2097136, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 14, "n_measured": 14, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 2097136, "hi": 536870896, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 14, "n_measured": 14, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int6_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 1835008, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8719, "median": 0.8718, "tol": 0.02, "n": 4, "n_measured": 4, "why": "bound regime change"},
+      {"lo": 1835008, "hi": 536870912, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int6_qf/aligned": "qr_off/aligned",
+    "qr_int6_qf/unaligned": "qr_off/unaligned",
+    "qr_int6_qf/padded": [
+      {"lo": 0, "hi": 2097136, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 14, "n_measured": 14, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 2097136, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 76, "n_measured": 57, "why": "push at parity with the stock path"}
+    ],
+    "qr_int4_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 536870912, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int4_qf/aligned": "qr_off/aligned",
+    "qr_int4_qf/unaligned": "qr_off/unaligned",
+    "qr_int4_qf/padded": [
+      {"lo": 0, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 90, "n_measured": 71, "why": "push at parity with the stock path"}
+    ],
+    "qr_fp_bf16_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 1835008, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8719, "median": 0.8718, "tol": 0.02, "n": 4, "n_measured": 4, "why": "bound regime change"},
+      {"lo": 1835008, "hi": 536870912, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.7939, "median": 0.7939, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_window_w2048 (>= 3% on >= 3 points)"}
+    ],
+    "qr_fp_bf16_qf/aligned": "qr_off/aligned",
+    "qr_fp_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_fp_bf16_qf/padded": [
+      {"lo": 0, "hi": 2000000, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 13, "n_measured": 13, "why": "stock: no push arm at parity"},
+      {"lo": 2000000, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 1.0036, "median": 1.0036, "tol": 0.02, "n": 77, "n_measured": 58, "why": "push at parity with the stock path"}
+    ],
+    "qr_int8_bf16_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 8126464, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8803, "tol": 0.02, "n": 28, "n_measured": 28, "why": "bound regime change"},
+      {"lo": 8126464, "hi": 536870912, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 29, "n_measured": 29, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int8_bf16_qf/aligned": "qr_off/aligned",
+    "qr_int8_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_int8_bf16_qf/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 8388592, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9911, "tol": 0.02, "n": 4, "n_measured": 4, "why": "push at parity with the stock path"},
+      {"lo": 8388592, "hi": 536870896, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 14, "n_measured": 14, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int6_bf16_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 8126464, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8803, "tol": 0.02, "n": 28, "n_measured": 28, "why": "bound regime change"},
+      {"lo": 8126464, "hi": 536870912, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int6_bf16_qf/aligned": "qr_off/aligned",
+    "qr_int6_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_int6_bf16_qf/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 8388592, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9911, "tol": 0.02, "n": 4, "n_measured": 4, "why": "push at parity with the stock path"},
+      {"lo": 8388592, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 71, "n_measured": 55, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"}
+    ],
+    "qr_int4_bf16_qf/fast": [
+      {"lo": 0, "hi": 7456, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.9113, "median": 0.8507, "tol": 0.05, "n": 19, "n_measured": 19, "why": "push at parity with the stock path"},
+      {"lo": 7456, "hi": 65536, "head": "one_shot_w1024", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.8038, "median": 0.7231, "tol": 0.0483, "n": 17, "n_measured": 17, "why": "sustained gain over one_shot_w512 (>= 3% on >= 3 points)"},
+      {"lo": 65536, "hi": 245760, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8764, "median": 0.8194, "tol": 0.0384, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 245760, "hi": 1015808, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9149, "median": 0.849, "tol": 0.02, "n": 28, "n_measured": 16, "why": "sustained gain over two_shot_w4096_f8 (>= 3% on >= 3 points)"},
+      {"lo": 1015808, "hi": 1044480, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9034, "median": 0.9034, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_w2048_f2_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 1044480, "hi": 8126464, "head": "two_shot_window_w2048", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.8896, "median": 0.8803, "tol": 0.02, "n": 28, "n_measured": 28, "why": "bound regime change"},
+      {"lo": 8126464, "hi": 536870912, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: no push arm at parity"}
+    ],
+    "qr_int4_bf16_qf/aligned": "qr_off/aligned",
+    "qr_int4_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_int4_bf16_qf/padded": [
+      {"lo": 0, "hi": 3145712, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 15, "n_measured": 15, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 3145712, "hi": 8388592, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9911, "tol": 0.02, "n": 4, "n_measured": 4, "why": "push at parity with the stock path"},
+      {"lo": 8388592, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 71, "n_measured": 55, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"}
+    ]
+  }
+}
