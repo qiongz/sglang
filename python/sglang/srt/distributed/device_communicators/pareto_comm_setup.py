@@ -22,7 +22,7 @@ from typing import List, Optional
 
 import torch
 
-from sglang.srt.utils import is_gfx95_supported, is_hip
+from sglang.srt.utils import get_bool_env_var, is_gfx95_supported, is_hip
 
 logger = logging.getLogger(__name__)
 
@@ -168,10 +168,24 @@ def stock_profile_of(group):
     return profile
 
 
-def create_pareto_comm(group):
+def fused_hidden_sizes():
+    """The row widths of the fused all-reduce + residual add + RMSNorm the
+    communicator serves: the model's hidden size on the aiter route (the only
+    route that calls the fused entry point), else none. The model config is
+    built before the parallel groups, so the fused instances share the one
+    IPC allocation made before the KV cache memory is measured."""
+    if not get_bool_env_var("SGLANG_USE_AITER"):
+        return ()
+    from sglang.srt.runtime_context import process_model_config
+
+    return (int(process_model_config().hidden_size),)
+
+
+def create_pareto_comm(group, hidden_sizes=None):
     """Build the group's ParetoCommunicator (collective over the group), or
     return None. Every rank of the group reaches the same decision: the inputs
-    are the group's shared configuration."""
+    are the group's shared configuration. hidden_sizes: the fused calls' row
+    widths (None: fused_hidden_sizes())."""
     from sglang.srt.distributed.device_communicators.pareto_comm import (
         ParetoCommunicator,
         pareto_comm_platform,
@@ -193,6 +207,7 @@ def create_pareto_comm(group):
         group.cpu_group,
         group.device,
         stock_profile=profile,
+        hidden_sizes=fused_hidden_sizes() if hidden_sizes is None else hidden_sizes,
     )
     if comm.disabled:
         comm.close()

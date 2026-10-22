@@ -53,6 +53,7 @@ from sglang.srt.layers.layer_boundary.residual import bind_update
 from sglang.srt.layers.layer_boundary.residual.add_norm import (
     aiter_ar_fusion_applies,
     flashinfer_ar_fusion_applies,
+    pareto_comm_fusion_applies,
 )
 from sglang.srt.layers.layer_boundary.residual.stream import ResidualStream
 from sglang.srt.layers.moe import (
@@ -480,7 +481,10 @@ def _batch_allows_deferred_sum(
         return True
     # Aiter also checks width and bytes, so use the actual residual storage.
     residual = forward_batch.residual_stream.residual
-    return residual is not None and aiter_ar_fusion_applies(residual, forward_batch)
+    return residual is not None and (
+        aiter_ar_fusion_applies(residual, forward_batch)
+        or pareto_comm_fusion_applies(residual)
+    )
 
 
 class ExitDecision(msgspec.Struct, frozen=True):
