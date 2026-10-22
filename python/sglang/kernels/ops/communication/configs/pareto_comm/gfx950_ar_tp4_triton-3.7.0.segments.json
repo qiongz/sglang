@@ -423,5 +423,49 @@
       {"lo": 11914512, "hi": 16701168, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 1.0175, "median": 0.9788, "tol": 0.02, "n": 6, "n_measured": 6, "why": "push at parity with the stock path"},
       {"lo": 16701168, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 38, "n_measured": 36, "why": "sustained gain over two_shot_epoch_c12_w4096 (>= 3% on >= 3 points)"}
     ]
+  },
+  "fused": {
+    "ADD_RMS": {
+      "profile": "qr_off",
+      "floor": "bf16",
+      "plans": {
+        "two_shot": [
+          {"lo": 0, "hi": 24576, "head": "stock", "floor": "bf16", "stock_arm": "aiter1", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.0359, "n": 4, "n_measured": 4},
+          {"lo": 24576, "hi": 233472, "head": "two_shot_w2048_f2", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.6396, "median": 0.575, "tol": 0.05, "n": 28, "n_measured": 28},
+          {"lo": 233472, "hi": 473088, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.7512, "median": 0.6623, "tol": 0.0277, "n": 13, "n_measured": 13},
+          {"lo": 473088, "hi": 2652160, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0006, "median": 0.8795, "tol": 0.025, "n": 28, "n_measured": 28},
+          {"lo": 2652160, "hi": 6291456, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 13, "n_measured": 13},
+          {"lo": 6291456, "hi": 14966784, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0196, "median": 0.9973, "tol": 0.02, "n": 13, "n_measured": 13},
+          {"lo": 14966784, "hi": 234881024, "head": "stock", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 39, "n_measured": 39}
+        ],
+        "one_shot+two_shot": [
+          {"lo": 0, "hi": 24576, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "aiter1", "bound": "launch_latency", "worst": 0.8565, "median": 0.814, "tol": 0.0359, "n": 4, "n_measured": 4},
+          {"lo": 24576, "hi": 233472, "head": "two_shot_w2048_f2", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.6396, "median": 0.575, "tol": 0.05, "n": 28, "n_measured": 28},
+          {"lo": 233472, "hi": 473088, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.7512, "median": 0.6623, "tol": 0.0277, "n": 13, "n_measured": 13},
+          {"lo": 473088, "hi": 2652160, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0006, "median": 0.8795, "tol": 0.025, "n": 28, "n_measured": 28},
+          {"lo": 2652160, "hi": 6291456, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 13, "n_measured": 13},
+          {"lo": 6291456, "hi": 14966784, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0196, "median": 0.9973, "tol": 0.02, "n": 13, "n_measured": 13},
+          {"lo": 14966784, "hi": 234881024, "head": "stock", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 39, "n_measured": 39}
+        ],
+        "two_shot+two_shot_epoch": [
+          {"lo": 0, "hi": 24576, "head": "stock", "floor": "bf16", "stock_arm": "aiter1", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.0359, "n": 4, "n_measured": 4},
+          {"lo": 24576, "hi": 233472, "head": "two_shot_w2048_f2", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.6396, "median": 0.575, "tol": 0.05, "n": 28, "n_measured": 28},
+          {"lo": 233472, "hi": 473088, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.7512, "median": 0.6623, "tol": 0.0277, "n": 13, "n_measured": 13},
+          {"lo": 473088, "hi": 2652160, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0006, "median": 0.8795, "tol": 0.025, "n": 28, "n_measured": 28},
+          {"lo": 2652160, "hi": 6291456, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 13, "n_measured": 13},
+          {"lo": 6291456, "hi": 10579968, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0196, "median": 0.998, "tol": 0.02, "n": 8, "n_measured": 8},
+          {"lo": 10579968, "hi": 234881024, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "bandwidth", "worst": 0.9336, "median": 0.8183, "tol": 0.02, "n": 44, "n_measured": 44}
+        ],
+        "one_shot+two_shot+two_shot_epoch": [
+          {"lo": 0, "hi": 24576, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "aiter1", "bound": "launch_latency", "worst": 0.8565, "median": 0.814, "tol": 0.0359, "n": 4, "n_measured": 4},
+          {"lo": 24576, "hi": 233472, "head": "two_shot_w2048_f2", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.6396, "median": 0.575, "tol": 0.05, "n": 28, "n_measured": 28},
+          {"lo": 233472, "hi": 473088, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.7512, "median": 0.6623, "tol": 0.0277, "n": 13, "n_measured": 13},
+          {"lo": 473088, "hi": 2652160, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0006, "median": 0.8795, "tol": 0.025, "n": 28, "n_measured": 28},
+          {"lo": 2652160, "hi": 6291456, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 13, "n_measured": 13},
+          {"lo": 6291456, "hi": 10579968, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0196, "median": 0.998, "tol": 0.02, "n": 8, "n_measured": 8},
+          {"lo": 10579968, "hi": 234881024, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "bandwidth", "worst": 0.9336, "median": 0.8183, "tol": 0.02, "n": 44, "n_measured": 44}
+        ]
+      }
+    }
   }
 }
