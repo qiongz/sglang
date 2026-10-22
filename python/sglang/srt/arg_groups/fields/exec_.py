@@ -757,6 +757,12 @@ class ExecComm(msgspec.Struct):
     enable_aiter_allreduce_fusion: A[
         bool, Arg(help="Enable Aiter AllReduce Fusion.", resolvable=True)
     ] = False
+    enable_amd_push_comm: A[
+        bool,
+        "Enable amd-push-comm (ROCm gfx950, one node): a push all-reduce for "
+        "the TP group that takes over only the message sizes where it is at "
+        "least as fast as the existing path at the same precision.",
+    ] = False
     disable_aiter_allreduce_fusion_in_prefill: A[
         bool,
         Arg(
