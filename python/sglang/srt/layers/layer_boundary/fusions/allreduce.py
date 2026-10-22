@@ -27,6 +27,7 @@ from sglang.srt.layers.layer_boundary.residual.add_norm import (
     Fp8Input,
     NormQuantReadout,
     aiter_ar_fusion_applies,
+    amd_push_comm_fusion_applies,
     flashinfer_ar_fusion_applies,
 )
 from sglang.srt.layers.layernorm import GemmaRMSNorm, RMSNorm
@@ -93,6 +94,7 @@ def fused_attn_input(
     if not (
         aiter_ar_fusion_applies(hidden_states, forward_batch)
         or flashinfer_ar_fusion_applies(hidden_states.shape[0])
+        or amd_push_comm_fusion_applies(hidden_states)
     ):
         return None
     if fuses_quant:
@@ -158,6 +160,7 @@ def fused_ffn_input(
     if not (
         aiter_ar_fusion_applies(hidden_states, forward_batch)
         or flashinfer_ar_fusion_applies(hidden_states.shape[0])
+        or amd_push_comm_fusion_applies(hidden_states)
     ):
         return None
     return plan.norm.forward_with_allreduce_fusion(

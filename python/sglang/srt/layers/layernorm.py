@@ -217,6 +217,7 @@ def _forward_with_allreduce_fusion(
     if residual is not None:
         from sglang.srt.distributed import (
             attention_tensor_model_parallel_all_reduce,
+            get_tp_group,
             tensor_model_parallel_all_reduce,
             tensor_model_parallel_fused_allreduce_rmsnorm,
         )
@@ -267,7 +268,12 @@ def _forward_with_allreduce_fusion(
                 return norm_module.forward(x, residual, None)
 
             # For AITER route, preserve correctness when fused path is unavailable.
-            if _use_aiter and get_exec().comm.enable_aiter_allreduce_fusion:
+            # (amd-push-comm's fusion is applied independently of aiter's switch:
+            # when it declines, the sum still has to be completed here.)
+            if _use_aiter and (
+                get_exec().comm.enable_aiter_allreduce_fusion
+                or get_tp_group().amd_push_comm is not None
+            ):
                 x = tensor_model_parallel_all_reduce(x)
                 return norm_module.forward(x, residual, None)
 

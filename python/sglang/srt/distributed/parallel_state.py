@@ -838,6 +838,12 @@ class GroupCoordinator:
         eps: float,
     ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
         """Attempt fused all-reduce + RMSNorm via custom all-reduce communicator. ROCm/HIP Only"""
+        if self.amd_push_comm is not None and not is_in_tc_piecewise_cuda_graph():
+            fused = self.amd_push_comm.fused_allreduce_rmsnorm(
+                input_, residual_inp_, weight_, eps
+            )
+            if fused is not None:
+                return fused
         ca_comm = self.ca_comm
         if ca_comm is None or getattr(ca_comm, "disabled", True):
             return None

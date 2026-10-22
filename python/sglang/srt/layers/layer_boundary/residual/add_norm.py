@@ -182,6 +182,26 @@ def aiter_ar_fusion_applies(input_tensor: torch.Tensor, forward_batch: ForwardBa
     )
 
 
+def amd_push_comm_fusion_applies(input_tensor: torch.Tensor) -> bool:
+    """Would the TP group's amd-push-comm communicator take the fused
+    all-reduce + add + RMSNorm of input_tensor [m, H]? Independent of aiter's
+    fusion switches. Every sum it completes here must be over the TP group:
+    no attention DP, attention TP and the MoE output's reduction group both
+    spanning the TP group."""
+    if not _use_aiter or is_dp_attention_enabled():
+        return False
+    parallel = get_parallel()
+    moe_world = (
+        parallel.moe_ep_size if parallel.moe_ep_size > 1 else parallel.moe_tp_size
+    )
+    if parallel.attn_tp_size != parallel.tp_size or moe_world != parallel.tp_size:
+        return False
+    from sglang.srt.distributed.parallel_state import get_tp_group
+
+    comm = get_tp_group().amd_push_comm
+    return comm is not None and comm.should_fuse(input_tensor)
+
+
 def _update_and_read_residual_plain(
     norm, hidden_states, residual, post_residual_addition
 ):
