@@ -93,3 +93,16 @@ for _fn in ("all_gather_matmul", "matmul_reduce_scatter"):
         )
     )
 del _fn
+
+# pareto-comm (gfx950): the arch / Triton guard lives in the runtime
+# communicator; the capability arch window applies to CUDA only.
+for _algo in ("one_shot", "two_shot", "two_shot_epoch", "two_shot_window"):
+    register_kernel(
+        KernelSpec(
+            op=f"communication.pareto_comm_all_reduce_{_algo}",
+            backend=KernelBackend.TRITON,
+            target=f"sglang.kernels.ops.communication.pareto_comm.{_algo}:{_algo}_kernel",
+            capabilities=frozenset({CapabilityRequirement.HIP}),
+        )
+    )
+del _algo
