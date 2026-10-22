@@ -5,7 +5,12 @@ For each message-size segment it runs the best of its own kernels and the
 deployment's own path: ParetoCommunicator(group, device).all_reduce(x) returns
 the result, or None where the table keeps the deployment's path. Guard:
 ROCm, gfx950, Triton 3.7.0 with Gluon, world size 2 / 4 / 8 on one node.
-Construction is collective; refusal depends only on rank-uniform facts."""
+Construction is collective; refusal depends only on rank-uniform facts.
+
+With hidden_sizes, fused_allreduce_rmsnorm(x, residual, weight, eps) returns
+(out, residual_out) of the all-reduce of x [m, H] + the residual add + RMSNorm
+(the table's fused plans, by message bytes; H only decides which kernels can
+run), or None."""
 
 from __future__ import annotations
 
@@ -365,6 +370,7 @@ class _Spec:
         self.inst = None
         self.ms = [1]
         self.tail = False
+        self.norm = False  # a fused-call instance (residual add + RMSNorm)
 
 
 # kernels with a masked-tail entry
@@ -570,6 +576,81 @@ class _PlainAR:
         return lambda t: lf(t.view(-1, h)).view(t.shape)
 
 
+class _FusedAR:
+    """All-reduce + residual add + RMSNorm of [m, H] (H in hidden_sizes), by
+    message bytes m x H x 2 (the segment table's fused plans). Per H the
+    segments become m ranges; one instance per distinct (kernel, H, geometry),
+    sized for the largest m it serves. A stock segment, an m above the plans or
+    a kernel that cannot run the norm with the build's options is refused."""
+
+    def __init__(self, world, seg_table, profile, hidden_sizes, max_tokens, tag):
+        K = _kernels()
+        table, two_shot = K.table, K.two_shot
+        self.sel = {}  # H -> [(lo m, hi m, spec)]
+        self.specs = []
+        pool = {}
+        for h in dict.fromkeys(int(v) for v in hidden_sizes):
+
+            def legal(g, h=h):
+                try:
+                    two_shot.check_cfg(world, h, g, tag)
+                    return True
+                except AssertionError:
+                    return False
+
+            rb, ranges = 2 * h, []
+            for sg in table.fused_segments(seg_table, profile, h):
+                lo, hi = sg["lo"] // rb + 1, min(sg["hi"] // rb, int(max_tokens))
+                if lo > hi or sg["algo"] == "stock":
+                    continue
+                geom = table.fused_geom(seg_table["impls"][sg["name"]], h, legal)
+                if geom is None:
+                    continue
+                key = (sg["algo"], h, repr(sorted(geom.items())))
+                sp = pool.get(key)
+                if sp is None:
+                    sp = pool[key] = _Spec(sg["algo"], h, hi, geom)
+                    sp.m0 = lo
+                    sp.norm = True
+                    self.specs.append(sp)
+                sp.rows, sp.m0 = max(sp.rows, hi), min(sp.m0, lo)
+                ranges.append((lo, hi, sp))
+            if ranges:
+                self.sel[h] = ranges
+        for sp in self.specs:
+            if sp.kind == "two_shot_epoch":
+                sp.rows = max(8, sp.rows)
+            sp.ms = two_shot.m_classes(sp.m0, sp.rows)
+
+    def pick(self, x, residual, weight):
+        """The instance serving the fused call, or None (no side effect)."""
+        if x.dim() != 2 or x.dtype != torch.bfloat16 or not x.is_contiguous():
+            return None
+        m, h = x.shape
+        ranges = self.sel.get(h)
+        if ranges is None or m == 0:
+            return None
+        if (
+            residual.dtype != torch.bfloat16
+            or tuple(residual.shape) != (m, h)
+            or weight.dtype != torch.bfloat16
+            or weight.numel() != h
+            or residual.device != x.device
+            or weight.device != x.device
+        ):
+            return None
+        for lo, hi, sp in ranges:
+            if lo <= m <= hi:
+                return sp.inst if sp.inst.can_norm else None
+        return None
+
+    def serves(self, m, h):
+        """Would a fused [m, h] call be taken (its operands aside)?"""
+        return any(
+            lo <= m <= hi and sp.inst.can_norm for lo, hi, sp in self.sel.get(h, ())
+        )
+
+
 # ------------------------------------------------------------ communicator
 _KIND_CODE = {"one_shot": 1, "two_shot": 2, "two_shot_epoch": 3, "two_shot_window": 4}
 STREAM_GUARDS = ("serial", "default", "off")
@@ -583,6 +664,9 @@ class ParetoCommunicator:
     stream_guard: "serial" (any stream; calls are ordered and single-threaded),
     "default" (refuse non-default streams outside capture) or "off".
     segments_table: override the shipped table (tests).
+    hidden_sizes: the row widths H of the fused all-reduce + residual add +
+    RMSNorm (fused_allreduce_rmsnorm; () = none); fused_max_tokens: the
+    largest m it serves (the plans may stop earlier).
     """
 
     def __init__(
@@ -604,6 +688,8 @@ class ParetoCommunicator:
         monitor_period: float = 0.05,
         seq_check: bool = False,
         segments_table=None,
+        hidden_sizes=(),
+        fused_max_tokens: int = 32768,
     ):
         self.group = group
         self.rank = dist.get_rank(group=group)
@@ -630,6 +716,7 @@ class ParetoCommunicator:
         self.disabled = True
         self.closed = False
         self.plain = None
+        self.fused = None
         self.mon = None
         self._pages = None
         self.ws = None
@@ -667,8 +754,10 @@ class ParetoCommunicator:
                 on_fatal,
                 monitor_period,
                 seq_check,
+                hidden_sizes,
+                fused_max_tokens,
             )
-        self.disabled = self.plain is None
+        self.disabled = self.plain is None and self.fused is None
         logger.info(
             "pareto-comm rank %d/%d: %s; IPC %.1f MB",
             self.rank,
@@ -688,6 +777,8 @@ class ParetoCommunicator:
         on_fatal,
         monitor_period,
         seq_check,
+        hidden_sizes=(),
+        fused_max_tokens=32768,
     ):
         if btab is None:
             logger.info("pareto-comm: no segment table for TP%d", self.world)
@@ -696,9 +787,17 @@ class ParetoCommunicator:
             p = _PlainAR(self.world, int(max_bytes), btab, profile)
             if p.specs:
                 self.plain = p
-        if self.plain is None:
+        if hidden_sizes:
+            f = _FusedAR(
+                self.world, btab, profile, hidden_sizes, fused_max_tokens, seq_check
+            )
+            if f.specs:
+                self.fused = f
+        if self.plain is None and self.fused is None:
             return
-        specs = self.plain.specs
+        specs = (self.plain.specs if self.plain else []) + (
+            self.fused.specs if self.fused else []
+        )
         diag = self._start_pages() if monitor else None
 
         self.ws = ParetoCommWorkspace(self.group, self.device, self.rank, self.world)
@@ -733,7 +832,8 @@ class ParetoCommunicator:
         # the sentinel fills must land on every rank before any peer pushes
         torch.cuda.synchronize(self.device)
         dist.barrier(group=self.group)
-        self.plain.bind(self.device)
+        if self.plain is not None:
+            self.plain.bind(self.device)
         if warm:
             self._warmup(specs)
         if monitor:
@@ -757,7 +857,9 @@ class ParetoCommunicator:
 
         for sp in specs:
             x = torch.zeros(1, sp.hidden, dtype=torch.bfloat16, device=self.device)
-            if sp.tail and sp.inst.can_tail:
+            if sp.norm:  # the fused kernel (and the plain one: the first touch)
+                sp.inst.precompile(x, ms=sp.ms, norm=sp.inst.can_norm)
+            elif sp.tail and sp.inst.can_tail:
                 sp.inst.precompile(x, ms=sp.ms, tail=True)
             else:
                 sp.inst.precompile(x, ms=sp.ms)
@@ -802,9 +904,18 @@ class ParetoCommunicator:
         return diag
 
     def _summary(self):
-        if self.plain is None:
-            return ["nothing served"]
-        return [f"any shape <= {self.plain.max_bytes} B"]
+        out = []
+        if self.plain is not None:
+            out.append(f"any shape <= {self.plain.max_bytes} B")
+        if self.fused is not None:
+            out.append(
+                "fused add + RMSNorm "
+                + ", ".join(
+                    f"H{h} m <= {max(hi for _, hi, _ in r)}"
+                    for h, r in self.fused.sel.items()
+                )
+            )
+        return out or ["nothing served"]
 
     # ------------------------------------------------------------- calls
     def _call_ok(self, x):
@@ -841,12 +952,58 @@ class ParetoCommunicator:
 
     def should_push_ar(self, x) -> bool:
         """Would all_reduce(x) be taken over? (no side effect)"""
-        return self._call_ok(x) and self.plain.supports(x)
+        return self._call_ok(x) and self.plain is not None and self.plain.supports(x)
+
+    def should_fuse(self, x) -> bool:
+        """Would fused_allreduce_rmsnorm take x [m, H] (given bf16 residual
+        [m, H] and weight [H] operands)? No side effect."""
+        return (
+            self._call_ok(x)
+            and self.fused is not None
+            and x.dim() == 2
+            and x.dtype == torch.bfloat16
+            and x.is_contiguous()
+            and self.fused.serves(x.shape[0], x.shape[1])
+        )
+
+    def fused_allreduce_rmsnorm(
+        self, x, residual, weight, eps: float, site: int = 0
+    ) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
+        """(out, residual_out) of the all-reduce of x [m, H] + residual, then
+        RMSNorm with weight [H]: residual_out = bf16(f32(bf16(AR)) +
+        f32(residual)), out = bf16(residual_out * rstd * weight). None when not
+        taken over (the caller keeps its own path); x and residual are not
+        modified."""
+        if not self._call_ok(x) or self.fused is None:
+            return None
+        p = self.fused.pick(x, residual, weight)
+        if p is None:
+            return None
+        args = (
+            _aligned(x),
+            _aligned(residual.contiguous()),
+            _aligned(weight.contiguous()),
+        )
+        self.site_box[0] = int(site)
+        cap = torch.cuda.is_current_stream_capturing()
+        if self.mon is not None and not cap:
+            self.mon.check()
+        if self.stream_guard != "serial":
+            return p.ar_add_rmsnorm(*args, eps)
+        # atomic, as all_reduce: refused without side effect
+        if not self._lock.acquire(blocking=False):
+            return None
+        try:
+            if not cap:
+                self._order_stream()
+            return p.ar_add_rmsnorm(*args, eps)
+        finally:
+            self._lock.release()
 
     def all_reduce(self, x, site: int = 0):
         """All-reduce x; returns the result, or None when not taken over. site:
         the call site's identity for seq_check."""
-        if not self._call_ok(x) or not self.plain.supports(x):
+        if not self._call_ok(x) or self.plain is None or not self.plain.supports(x):
             return None
         self.site_box[0] = int(site)
         if self.mon is None and self.stream_guard != "serial":
