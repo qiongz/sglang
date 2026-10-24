@@ -12,7 +12,9 @@
     "two_shot_epoch_c12_w4096_persistent": {"kind": "two_shot_epoch", "tier": "exact", "width": 4096, "geom": {"wire": "c12", "window": 2048, "f": 8, "npc": 24, "xs": 2}, "bound": "occupancy"},
     "two_shot_window_w2048": {"kind": "two_shot_window", "tier": "exact", "width": 2048, "geom": {}, "bound": "bandwidth"},
     "one_shot_w1024": {"kind": "one_shot", "tier": "exact", "width": 1024, "geom": {"NSEND": 8}, "bound": "launch_latency"},
-    "one_shot_w512": {"kind": "one_shot", "tier": "exact", "width": 512, "geom": {"NSEND": 8}, "bound": "launch_latency"}
+    "one_shot_w512": {"kind": "one_shot", "tier": "exact", "width": 512, "geom": {"NSEND": 8}, "bound": "launch_latency"},
+    "two_shot_w2048_f1_stagger10g8": {"kind": "two_shot", "tier": "exact", "width": 2048, "geom": {"F": 1, "NSEND": 2, "RA": 1, "NSLOT": 3, "PIPE": 1, "SDLY": 10, "SDG": 8}, "bound": "request_transaction"},
+    "two_shot_w1024_f1_nopipe": {"kind": "two_shot", "tier": "exact", "width": 1024, "geom": {"F": 1, "NSEND": 2, "RA": 1, "NSLOT": 3, "PIPE": 0}, "bound": "request_transaction"}
   },
   "profiles": {
     "qr_off": {"qr_level": null, "qr_min": 0, "qr_max": 0, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
@@ -284,5 +286,71 @@
       {"lo": 3145712, "hi": 8388592, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9955, "median": 0.9911, "tol": 0.02, "n": 4, "n_measured": 4, "why": "push at parity with the stock path"},
       {"lo": 8388592, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 71, "n_measured": 55, "why": "sustained gain over two_shot_epoch_c12_w4096_win1024 (>= 3% on >= 3 points)"}
     ]
+  },
+  "fused": {
+    "ADD_RMS": {
+      "profile": "qr_off",
+      "floor": "bf16",
+      "plans": {
+        "two_shot": [
+          {"lo": 0, "hi": 28672, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 5, "n_measured": 5},
+          {"lo": 28672, "hi": 114688, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.6998, "median": 0.6495, "tol": 0.0231, "n": 15, "n_measured": 15},
+          {"lo": 114688, "hi": 163840, "head": "two_shot_w2048_f1_stagger10g8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.7524, "median": 0.7151, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 163840, "hi": 329728, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.8564, "median": 0.8087, "tol": 0.0203, "n": 12, "n_measured": 12},
+          {"lo": 329728, "hi": 1114112, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0032, "median": 0.9357, "tol": 0.02, "n": 19, "n_measured": 19},
+          {"lo": 1114112, "hi": 1118208, "head": "stock", "floor": "bf16", "stock_arm": "aiter1", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 1118208, "hi": 1867776, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0118, "median": 0.981, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 1867776, "hi": 2228224, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.9938, "median": 0.9896, "tol": 0.02, "n": 4, "n_measured": 4},
+          {"lo": 2228224, "hi": 234881024, "head": "stock", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.05, "n": 68, "n_measured": 68}
+        ],
+        "one_shot+two_shot": [
+          {"lo": 0, "hi": 32768, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "aiter1", "bound": "launch_latency", "worst": 0.7148, "median": 0.6802, "tol": 0.02, "n": 6, "n_measured": 6},
+          {"lo": 32768, "hi": 114688, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.6998, "median": 0.6499, "tol": 0.0231, "n": 14, "n_measured": 14},
+          {"lo": 114688, "hi": 163840, "head": "two_shot_w2048_f1_stagger10g8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.7524, "median": 0.7151, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 163840, "hi": 329728, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.8564, "median": 0.8087, "tol": 0.0203, "n": 12, "n_measured": 12},
+          {"lo": 329728, "hi": 1114112, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0032, "median": 0.9357, "tol": 0.02, "n": 19, "n_measured": 19},
+          {"lo": 1114112, "hi": 1118208, "head": "stock", "floor": "bf16", "stock_arm": "aiter1", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 1118208, "hi": 1867776, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0118, "median": 0.981, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 1867776, "hi": 2228224, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.9938, "median": 0.9896, "tol": 0.02, "n": 4, "n_measured": 4},
+          {"lo": 2228224, "hi": 234881024, "head": "stock", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.05, "n": 68, "n_measured": 68}
+        ],
+        "two_shot+two_shot_epoch": [
+          {"lo": 0, "hi": 28672, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 5, "n_measured": 5},
+          {"lo": 28672, "hi": 114688, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.6998, "median": 0.6495, "tol": 0.0231, "n": 15, "n_measured": 15},
+          {"lo": 114688, "hi": 163840, "head": "two_shot_w2048_f1_stagger10g8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.7524, "median": 0.7151, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 163840, "hi": 329728, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.8564, "median": 0.8087, "tol": 0.0203, "n": 12, "n_measured": 12},
+          {"lo": 329728, "hi": 1114112, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0032, "median": 0.9357, "tol": 0.02, "n": 19, "n_measured": 19},
+          {"lo": 1114112, "hi": 1118208, "head": "stock", "floor": "bf16", "stock_arm": "aiter1", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 1118208, "hi": 1867776, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0118, "median": 0.981, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 1867776, "hi": 2097152, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.9002, "median": 0.9002, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 2097152, "hi": 2222080, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.9938, "median": 0.9938, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 2222080, "hi": 2228224, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.9137, "median": 0.9137, "tol": 0.02, "n": 2, "n_measured": 2},
+          {"lo": 2228224, "hi": 3735552, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca+tail", "bound": "bandwidth", "worst": 0.9362, "median": 0.9037, "tol": 0.0284, "n": 7, "n_measured": 7},
+          {"lo": 3735552, "hi": 3741696, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 3741696, "hi": 4194304, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.8908, "median": 0.8908, "tol": 0.02, "n": 2, "n_measured": 2},
+          {"lo": 4194304, "hi": 5289984, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca+tail", "bound": "bandwidth", "worst": 0.9839, "median": 0.9179, "tol": 0.05, "n": 3, "n_measured": 3},
+          {"lo": 5289984, "hi": 6291456, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.8865, "median": 0.8636, "tol": 0.05, "n": 3, "n_measured": 3},
+          {"lo": 6291456, "hi": 234881024, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "bandwidth", "worst": 0.9283, "median": 0.8482, "tol": 0.05, "n": 52, "n_measured": 52}
+        ],
+        "one_shot+two_shot+two_shot_epoch": [
+          {"lo": 0, "hi": 32768, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "aiter1", "bound": "launch_latency", "worst": 0.7148, "median": 0.6802, "tol": 0.02, "n": 6, "n_measured": 6},
+          {"lo": 32768, "hi": 114688, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.6998, "median": 0.6499, "tol": 0.0231, "n": 14, "n_measured": 14},
+          {"lo": 114688, "hi": 163840, "head": "two_shot_w2048_f1_stagger10g8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.7524, "median": 0.7151, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 163840, "hi": 329728, "head": "two_shot_w4096_f8", "floor": "bf16", "stock_arm": "aiter1", "bound": "request_transaction", "worst": 0.8564, "median": 0.8087, "tol": 0.0203, "n": 12, "n_measured": 12},
+          {"lo": 329728, "hi": 1114112, "head": "two_shot_w2048_f2_stagger10g8", "floor": "bf16", "stock_arm": "aiter2", "bound": "request_transaction", "worst": 1.0032, "median": 0.9357, "tol": 0.02, "n": 19, "n_measured": 19},
+          {"lo": 1114112, "hi": 1118208, "head": "stock", "floor": "bf16", "stock_arm": "aiter1", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 1118208, "hi": 1867776, "head": "two_shot_w2048_f1", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 1.0118, "median": 0.981, "tol": 0.02, "n": 7, "n_measured": 7},
+          {"lo": 1867776, "hi": 2097152, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.9002, "median": 0.9002, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 2097152, "hi": 2222080, "head": "two_shot_w1024_f1_nopipe", "floor": "bf16", "stock_arm": "ca+tail", "bound": "request_transaction", "worst": 0.9938, "median": 0.9938, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 2222080, "hi": 2228224, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.9137, "median": 0.9137, "tol": 0.02, "n": 2, "n_measured": 2},
+          {"lo": 2228224, "hi": 3735552, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca+tail", "bound": "bandwidth", "worst": 0.9362, "median": 0.9037, "tol": 0.0284, "n": 7, "n_measured": 7},
+          {"lo": 3735552, "hi": 3741696, "head": "stock", "floor": "bf16", "stock_arm": "ca+tail", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1},
+          {"lo": 3741696, "hi": 4194304, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.8908, "median": 0.8908, "tol": 0.02, "n": 2, "n_measured": 2},
+          {"lo": 4194304, "hi": 5289984, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca+tail", "bound": "bandwidth", "worst": 0.9839, "median": 0.9179, "tol": 0.05, "n": 3, "n_measured": 3},
+          {"lo": 5289984, "hi": 6291456, "head": "two_shot_epoch_c12_w4096_persistent", "floor": "bf16", "stock_arm": "ca+tail", "bound": "occupancy", "worst": 0.8865, "median": 0.8636, "tol": 0.05, "n": 3, "n_measured": 3},
+          {"lo": 6291456, "hi": 234881024, "head": "two_shot_epoch_c12_w4096_win1024", "floor": "bf16", "stock_arm": "rccl+tail", "bound": "bandwidth", "worst": 0.9283, "median": 0.8482, "tol": 0.05, "n": 52, "n_measured": 52}
+        ]
+      }
+    }
   }
 }
