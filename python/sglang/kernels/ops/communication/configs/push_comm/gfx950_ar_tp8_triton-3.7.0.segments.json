@@ -1,0 +1,326 @@
+{
+  "kind": "ar_segments",
+  "arch": "gfx950",
+  "tp": 8,
+  "toolchain": "triton-3.7.0",
+  "impls": {
+    "two_shot_w16384_f16_nopipe": {"kind": "two_shot", "tier": "exact", "width": 16384, "geom": {"F": 16, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 0}, "bound": "request_transaction"},
+    "two_shot_w2048_f2_nopipe": {"kind": "two_shot", "tier": "exact", "width": 2048, "geom": {"F": 2, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 0}, "bound": "request_transaction"},
+    "two_shot_w4096_f4": {"kind": "two_shot", "tier": "exact", "width": 4096, "geom": {"F": 4, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 1}, "bound": "request_transaction"},
+    "two_shot_w4096_f4_stagger10g8": {"kind": "two_shot", "tier": "exact", "width": 4096, "geom": {"F": 4, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 1, "SDLY": 10, "SDG": 8}, "bound": "request_transaction"},
+    "two_shot_w4096_f4_stagger20g16": {"kind": "two_shot", "tier": "exact", "width": 4096, "geom": {"F": 4, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 1, "SDLY": 20, "SDG": 16}, "bound": "request_transaction"},
+    "two_shot_w4096_f4_nopipe": {"kind": "two_shot", "tier": "exact", "width": 4096, "geom": {"F": 4, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 0}, "bound": "request_transaction"},
+    "two_shot_w8192_f4": {"kind": "two_shot", "tier": "exact", "width": 8192, "geom": {"F": 4, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 1}, "bound": "request_transaction"},
+    "two_shot_w8192_f8": {"kind": "two_shot", "tier": "exact", "width": 8192, "geom": {"F": 8, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 1}, "bound": "request_transaction"},
+    "two_shot_w8192_f8_nopipe": {"kind": "two_shot", "tier": "exact", "width": 8192, "geom": {"F": 8, "NSEND": 8, "RA": 1, "NSLOT": 3, "PIPE": 0}, "bound": "request_transaction"},
+    "two_shot_epoch_c12_w4096": {"kind": "two_shot_epoch", "tier": "exact", "width": 4096, "geom": {"window": 2048, "ldspad": 0, "f": 8}, "bound": "bandwidth"},
+    "two_shot_window_w8192": {"kind": "two_shot_window", "tier": "exact", "width": 8192, "geom": {}, "bound": "bandwidth"},
+    "one_shot_w512": {"kind": "one_shot", "tier": "exact", "width": 512, "geom": {"NSEND": 8}, "bound": "launch_latency"},
+    "two_shot_epoch_xe8_w4096": {"kind": "two_shot_epoch", "tier": "int8", "width": 4096, "geom": {"wire": "xe8"}, "bound": "bandwidth"}
+  },
+  "profiles": {
+    "qr_off": {"qr_level": null, "qr_min": 0, "qr_max": 0, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_fp": {"qr_level": "FP", "qr_min": 16777216, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int8": {"qr_level": "INT8", "qr_min": 4194304, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int6": {"qr_level": "INT6", "qr_min": 4194304, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int4": {"qr_level": "INT4", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_fp_bf16": {"qr_level": "FP", "qr_min": 16777216, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int8_bf16": {"qr_level": "INT8", "qr_min": 2147483648, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int6_bf16": {"qr_level": "INT6", "qr_min": 2147483648, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_int4_bf16": {"qr_level": "INT4", "qr_min": 2147483648, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": false},
+    "qr_fp_qf": {"qr_level": "FP", "qr_min": 16777216, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int8_qf": {"qr_level": "INT8", "qr_min": 4194304, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int6_qf": {"qr_level": "INT6", "qr_min": 4194304, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int4_qf": {"qr_level": "INT4", "qr_min": 2097152, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_fp_bf16_qf": {"qr_level": "FP", "qr_min": 16777216, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int8_bf16_qf": {"qr_level": "INT8", "qr_min": 2147483648, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int6_bf16_qf": {"qr_level": "INT6", "qr_min": 2147483648, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true},
+    "qr_int4_bf16_qf": {"qr_level": "INT4", "qr_min": 2147483648, "qr_max": 2147483648, "ca_min": 0, "ca_max": 67108864, "qr_first": true}
+  },
+  "plans": {
+    "qr_off/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 22020096, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 1.0103, "median": 0.9776, "tol": 0.02, "n": 88, "n_measured": 88, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 22020096, "hi": 150994944, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 1.0013, "median": 0.9708, "tol": 0.02, "n": 129, "n_measured": 129, "why": "bound regime change"},
+      {"lo": 150994944, "hi": 1073741824, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 0.8658, "median": 0.8634, "tol": 0.02, "n": 23, "n_measured": 21, "why": "push at parity with the stock path"}
+    ],
+    "qr_off/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6756, "median": 0.6646, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 134217744, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 0.9965, "median": 0.9637, "tol": 0.02, "n": 9, "n_measured": 9, "why": "bound regime change"}
+    ],
+    "qr_off/unaligned": [
+      {"lo": 0, "hi": 35268, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.2266, "median": 0.1804, "tol": 0.05, "n": 290, "n_measured": 290, "why": "push at parity with the stock path"},
+      {"lo": 35268, "hi": 446856, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.2062, "median": 0.2031, "tol": 0.02, "n": 7, "n_measured": 7, "why": "bound regime change"},
+      {"lo": 446856, "hi": 785532, "head": "two_shot_w8192_f8_nopipe", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.173, "median": 0.1515, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 785532, "hi": 2097154, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.3213, "median": 0.2938, "tol": 0.02, "n": 7, "n_measured": 7, "why": "sustained gain over two_shot_w8192_f8_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097154, "hi": 2134518, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.3524, "median": 0.3499, "tol": 0.02, "n": 5, "n_measured": 5, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 2134518, "hi": 22718732, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.8626, "median": 0.7588, "tol": 0.02, "n": 74, "n_measured": 72, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 22718732, "hi": 133440236, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 0.9979, "median": 0.9817, "tol": 0.02, "n": 56, "n_measured": 56, "why": "bound regime change"},
+      {"lo": 133440236, "hi": 536870910, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "alignment_tail", "worst": 1.0175, "median": 1.0011, "tol": 0.02, "n": 175, "n_measured": 175, "why": "sustained gain over two_shot_window_w8192 (>= 3% on >= 3 points)"}
+    ],
+    "qr_off/padded": [
+      {"lo": 0, "hi": 37984880, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9949, "median": 0.9378, "tol": 0.02, "n": 7, "n_measured": 7, "why": "push at parity with the stock path"},
+      {"lo": 37984880, "hi": 117440496, "head": "stock", "floor": "bf16", "stock_arm": "rccl", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 11, "n_measured": 11, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 117440496, "hi": 1073745920, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 1.0156, "median": 1.0041, "tol": 0.02, "n": 24, "n_measured": 23, "why": "push at parity with the stock path"}
+    ],
+    "qr_fp/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 22020096, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 1.0103, "median": 0.9776, "tol": 0.02, "n": 88, "n_measured": 88, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 22020096, "hi": 67108864, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9884, "median": 0.9661, "tol": 0.02, "n": 87, "n_measured": 87, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.7834, "median": 0.7834, "tol": 0.02, "n": 2, "n_measured": 2, "why": "sustained gain over two_shot_window_w8192 (>= 3% on >= 3 points)"}
+    ],
+    "qr_fp/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6756, "median": 0.6646, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 134217744, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.739, "median": 0.7324, "tol": 0.02, "n": 9, "n_measured": 9, "why": "bound regime change"}
+    ],
+    "qr_fp/unaligned": "qr_off/unaligned",
+    "qr_fp/padded": [
+      {"lo": 0, "hi": 37984880, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9949, "median": 0.9378, "tol": 0.02, "n": 7, "n_measured": 7, "why": "push at parity with the stock path"},
+      {"lo": 37984880, "hi": 39472128, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: no push arm at parity"},
+      {"lo": 39472128, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.9057, "median": 0.9057, "tol": 0.02, "n": 37, "n_measured": 30, "why": "push at parity with the stock path"}
+    ],
+    "qr_int8/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 22020096, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 1.0103, "median": 0.9776, "tol": 0.02, "n": 88, "n_measured": 88, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 22020096, "hi": 67108864, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9884, "median": 0.9661, "tol": 0.02, "n": 87, "n_measured": 87, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "two_shot_epoch_xe8_w4096", "floor": "int8", "stock_arm": "qr8", "bound": "bandwidth", "worst": 0.8211, "median": 0.8014, "tol": 0.02, "n": 8, "n_measured": 8, "why": "xe8 at parity with QuickReduce INT8"}
+    ],
+    "qr_int8/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6756, "median": 0.6646, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 50331664, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.739, "median": 0.7324, "tol": 0.02, "n": 4, "n_measured": 4, "why": "bound regime change"},
+      {"lo": 50331664, "hi": 100663312, "head": "two_shot_window_w8192", "floor": "int8", "stock_arm": "qr8", "bound": "bandwidth", "worst": 0.9878, "median": 0.9878, "tol": 0.02, "n": 1, "n_measured": 1, "why": "push at parity with qr8 (stock-gap A/B)"},
+      {"lo": 100663312, "hi": 134217744, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: push measured slower than qr8 (stock-gap A/B)"}
+    ],
+    "qr_int8/unaligned": "qr_off/unaligned",
+    "qr_int8/padded": [
+      {"lo": 0, "hi": 37984880, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9949, "median": 0.9378, "tol": 0.02, "n": 7, "n_measured": 7, "why": "push at parity with the stock path"},
+      {"lo": 37984880, "hi": 39472128, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: no push arm at parity"},
+      {"lo": 39472128, "hi": 40101728, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9057, "median": 0.9057, "tol": 0.02, "n": 1, "n_measured": 1, "why": "push at parity with the stock path"},
+      {"lo": 40101728, "hi": 67108864, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 26, "n_measured": 9, "why": "stock: int8 tier pending the xe8 wire's measurements"},
+      {"lo": 67108864, "hi": 536870896, "head": "two_shot_epoch_xe8_w4096", "floor": "int8", "stock_arm": "qr8", "bound": "bandwidth", "worst": 0.9234, "median": 0.8799, "tol": 0.02, "n": 8, "n_measured": 8, "why": "xe8 at parity with QuickReduce INT8"}
+    ],
+    "qr_int6/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 22020096, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 1.0103, "median": 0.9776, "tol": 0.02, "n": 88, "n_measured": 88, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 22020096, "hi": 67108864, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9884, "median": 0.9661, "tol": 0.02, "n": 87, "n_measured": 87, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "two_shot_epoch_xe8_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": 0.9487, "median": 0.882, "tol": 0.02, "n": 8, "n_measured": 8, "why": "xe8 at parity with QuickReduce INT6"}
+    ],
+    "qr_int6/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6756, "median": 0.6646, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 50331664, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.739, "median": 0.7324, "tol": 0.02, "n": 4, "n_measured": 4, "why": "bound regime change"},
+      {"lo": 50331664, "hi": 134217744, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: push measured slower than qr6 (stock-gap A/B)"}
+    ],
+    "qr_int6/unaligned": "qr_off/unaligned",
+    "qr_int6/padded": [
+      {"lo": 0, "hi": 37984880, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9949, "median": 0.9378, "tol": 0.02, "n": 7, "n_measured": 7, "why": "push at parity with the stock path"},
+      {"lo": 37984880, "hi": 39472128, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: no push arm at parity"},
+      {"lo": 39472128, "hi": 40101728, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9057, "median": 0.9057, "tol": 0.02, "n": 1, "n_measured": 1, "why": "push at parity with the stock path"},
+      {"lo": 40101728, "hi": 67108864, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: int8 tier pending the xe8 wire's measurements"},
+      {"lo": 67108864, "hi": 100667392, "head": "two_shot_epoch_xe8_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": 1.0135, "median": 1.0135, "tol": 0.02, "n": 2, "n_measured": 2, "why": "xe8 at parity with QuickReduce INT6"},
+      {"lo": 100667392, "hi": 134221824, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: xe8 not at parity with QuickReduce INT6"},
+      {"lo": 134221824, "hi": 150995088, "head": "two_shot_epoch_xe8_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": 0.9879, "median": 0.9835, "tol": 0.02, "n": 5, "n_measured": 5, "why": "xe8 at parity with QuickReduce INT6"}
+    ],
+    "qr_int4/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 22020096, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 1.0103, "median": 0.9776, "tol": 0.02, "n": 88, "n_measured": 88, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 22020096, "hi": 67108864, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9884, "median": 0.9661, "tol": 0.02, "n": 87, "n_measured": 87, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 134217728, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: xe8 not at parity with QuickReduce INT4"},
+      {"lo": 134217728, "hi": 536870912, "head": "two_shot_epoch_xe8_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": 0.993, "median": 0.9606, "tol": 0.02, "n": 6, "n_measured": 6, "why": "xe8 at parity with QuickReduce INT4"}
+    ],
+    "qr_int4/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6756, "median": 0.6646, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 50331664, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.739, "median": 0.7324, "tol": 0.02, "n": 4, "n_measured": 4, "why": "bound regime change"},
+      {"lo": 50331664, "hi": 134217744, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: push measured slower than qr4 (stock-gap A/B)"}
+    ],
+    "qr_int4/unaligned": "qr_off/unaligned",
+    "qr_int4/padded": [
+      {"lo": 0, "hi": 37984880, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9949, "median": 0.9378, "tol": 0.02, "n": 7, "n_measured": 7, "why": "push at parity with the stock path"},
+      {"lo": 37984880, "hi": 39472128, "head": "stock", "floor": "bf16", "stock_arm": "ca", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: no push arm at parity"},
+      {"lo": 39472128, "hi": 40101728, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9057, "median": 0.9057, "tol": 0.02, "n": 1, "n_measured": 1, "why": "push at parity with the stock path"},
+      {"lo": 40101728, "hi": 536870896, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 44, "n_measured": 17, "why": "stock: int8 tier pending the xe8 wire's measurements"}
+    ],
+    "qr_fp_bf16/fast": "qr_fp/fast",
+    "qr_fp_bf16/aligned": "qr_fp/aligned",
+    "qr_fp_bf16/unaligned": "qr_off/unaligned",
+    "qr_fp_bf16/padded": "qr_fp/padded",
+    "qr_int8_bf16/fast": "qr_off/fast",
+    "qr_int8_bf16/aligned": "qr_off/aligned",
+    "qr_int8_bf16/unaligned": "qr_off/unaligned",
+    "qr_int8_bf16/padded": "qr_off/padded",
+    "qr_int6_bf16/fast": "qr_off/fast",
+    "qr_int6_bf16/aligned": "qr_off/aligned",
+    "qr_int6_bf16/unaligned": "qr_off/unaligned",
+    "qr_int6_bf16/padded": "qr_off/padded",
+    "qr_int4_bf16/fast": "qr_off/fast",
+    "qr_int4_bf16/aligned": "qr_off/aligned",
+    "qr_int4_bf16/unaligned": "qr_off/unaligned",
+    "qr_int4_bf16/padded": "qr_off/padded",
+    "qr_fp_qf/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 16769024, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9994, "median": 0.966, "tol": 0.02, "n": 66, "n_measured": 66, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 16769024, "hi": 536870912, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": 0.7834, "median": 0.7834, "tol": 0.02, "n": 2, "n_measured": 2, "why": "bound regime change"}
+    ],
+    "qr_fp_qf/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "qrfp", "bound": "request_transaction", "worst": 0.6543, "median": 0.6543, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 134217744, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 9, "n_measured": 9, "why": "bound regime change"}
+    ],
+    "qr_fp_qf/unaligned": "qr_off/unaligned",
+    "qr_fp_qf/padded": [
+      {"lo": 0, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "qrfp", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 45, "n_measured": 38, "why": "push at parity with the stock path"}
+    ],
+    "qr_int8_qf/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 4128768, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9434, "median": 0.9075, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 4128768, "hi": 18350080, "head": "two_shot_w2048_f2_nopipe", "floor": "int8", "stock_arm": "qr8", "bound": "request_transaction", "worst": 0.5747, "median": 0.5571, "tol": 0.02, "n": 28, "n_measured": 28, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 18350080, "hi": 67108864, "head": "two_shot_window_w8192", "floor": "int8", "stock_arm": "qr8", "bound": "bandwidth", "worst": 0.8264, "median": 0.7015, "tol": 0.02, "n": 93, "n_measured": 93, "why": "bound regime change"},
+      {"lo": 67108864, "hi": 536870912, "head": "two_shot_epoch_xe8_w4096", "floor": "int8", "stock_arm": "qr8", "bound": "bandwidth", "worst": 0.8211, "median": 0.8014, "tol": 0.02, "n": 8, "n_measured": 8, "why": "xe8 at parity with QuickReduce INT8"}
+    ],
+    "qr_int8_qf/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "int8", "stock_arm": "qr8", "bound": "request_transaction", "worst": null, "median": null, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 134217744, "head": "two_shot_window_w8192", "floor": "int8", "stock_arm": "qr8", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 9, "n_measured": 9, "why": "bound regime change"}
+    ],
+    "qr_int8_qf/unaligned": "qr_off/unaligned",
+    "qr_int8_qf/padded": [
+      {"lo": 0, "hi": 67108864, "head": "stock", "floor": "int8", "stock_arm": "qr8", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 26, "n_measured": 9, "why": "stock: int8 tier pending the xe8 wire's measurements"},
+      {"lo": 67108864, "hi": 536870896, "head": "two_shot_epoch_xe8_w4096", "floor": "int8", "stock_arm": "qr8", "bound": "bandwidth", "worst": 0.9234, "median": 0.8799, "tol": 0.02, "n": 8, "n_measured": 8, "why": "xe8 at parity with QuickReduce INT8"}
+    ],
+    "qr_int6_qf/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 4128768, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.9434, "median": 0.9075, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 4128768, "hi": 67108864, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 5, "n_measured": 5, "why": "stock: int8 tier pending the xe8 wire's measurements"},
+      {"lo": 67108864, "hi": 536870912, "head": "two_shot_epoch_xe8_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": 0.9487, "median": 0.882, "tol": 0.02, "n": 8, "n_measured": 8, "why": "xe8 at parity with QuickReduce INT6"}
+    ],
+    "qr_int6_qf/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "int6", "stock_arm": "qr6", "bound": "request_transaction", "worst": null, "median": null, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 134217744, "head": "two_shot_window_w8192", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 9, "n_measured": 9, "why": "bound regime change"}
+    ],
+    "qr_int6_qf/unaligned": "qr_off/unaligned",
+    "qr_int6_qf/padded": [
+      {"lo": 0, "hi": 67108864, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: int8 tier pending the xe8 wire's measurements"},
+      {"lo": 67108864, "hi": 100667392, "head": "two_shot_epoch_xe8_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": 1.0135, "median": 1.0135, "tol": 0.02, "n": 2, "n_measured": 2, "why": "xe8 at parity with QuickReduce INT6"},
+      {"lo": 100667392, "hi": 134221824, "head": "stock", "floor": "int6", "stock_arm": "qr6", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: xe8 not at parity with QuickReduce INT6"},
+      {"lo": 134221824, "hi": 150995088, "head": "two_shot_epoch_xe8_w4096", "floor": "int6", "stock_arm": "qr6", "bound": "bandwidth", "worst": 0.9879, "median": 0.9835, "tol": 0.02, "n": 5, "n_measured": 5, "why": "xe8 at parity with QuickReduce INT6"}
+    ],
+    "qr_int4_qf/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2064384, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7849, "tol": 0.02, "n": 23, "n_measured": 23, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2064384, "hi": 67108864, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: int8 tier pending the xe8 wire's measurements"},
+      {"lo": 67108864, "hi": 134217728, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 2, "n_measured": 2, "why": "stock: xe8 not at parity with QuickReduce INT4"},
+      {"lo": 134217728, "hi": 536870912, "head": "two_shot_epoch_xe8_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": 0.993, "median": 0.9606, "tol": 0.02, "n": 6, "n_measured": 6, "why": "xe8 at parity with QuickReduce INT4"}
+    ],
+    "qr_int4_qf/aligned": [
+      {"lo": 0, "hi": 38960, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7993, "median": 0.7087, "tol": 0.05, "n": 33, "n_measured": 33, "why": "push at parity with the stock path"},
+      {"lo": 38960, "hi": 524304, "head": "two_shot_w4096_f4_stagger20g16", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.5575, "median": 0.3908, "tol": 0.02, "n": 16, "n_measured": 16, "why": "bound regime change"},
+      {"lo": 524304, "hi": 1962656, "head": "two_shot_w16384_f16_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.4931, "median": 0.4819, "tol": 0.02, "n": 4, "n_measured": 4, "why": "sustained gain over two_shot_w4096_f4_stagger20g16 (>= 3% on >= 3 points)"},
+      {"lo": 1962656, "hi": 20971536, "head": "two_shot_w2048_f2_nopipe", "floor": "int4", "stock_arm": "qr4", "bound": "request_transaction", "worst": null, "median": null, "tol": 0.02, "n": 3, "n_measured": 3, "why": "sustained gain over two_shot_w16384_f16_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 20971536, "hi": 134217744, "head": "two_shot_window_w8192", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 9, "n_measured": 9, "why": "bound regime change"}
+    ],
+    "qr_int4_qf/unaligned": "qr_off/unaligned",
+    "qr_int4_qf/padded": [
+      {"lo": 0, "hi": 40101728, "head": "two_shot_epoch_c12_w4096", "floor": "int4", "stock_arm": "qr4", "bound": "bandwidth", "worst": null, "median": null, "tol": 0.02, "n": 9, "n_measured": 9, "why": "push at parity with the stock path"},
+      {"lo": 40101728, "hi": 67108864, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 36, "n_measured": 9, "why": "stock: int8 tier pending the xe8 wire's measurements"},
+      {"lo": 67108864, "hi": 536870896, "head": "stock", "floor": "int4", "stock_arm": "qr4", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 8, "n_measured": 8, "why": "stock: xe8 not at parity with QuickReduce INT4"}
+    ],
+    "qr_fp_bf16_qf/fast": "qr_fp_qf/fast",
+    "qr_fp_bf16_qf/aligned": "qr_fp_qf/aligned",
+    "qr_fp_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_fp_bf16_qf/padded": "qr_fp_qf/padded",
+    "qr_int8_bf16_qf/fast": [
+      {"lo": 0, "hi": 43008, "head": "one_shot_w512", "floor": "bf16", "stock_arm": "ca", "bound": "launch_latency", "worst": 0.7467, "median": 0.6449, "tol": 0.0473, "n": 21, "n_measured": 21, "why": "push at parity with the stock path"},
+      {"lo": 43008, "hi": 131072, "head": "two_shot_w4096_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6043, "median": 0.5827, "tol": 0.02, "n": 14, "n_measured": 14, "why": "bound regime change"},
+      {"lo": 131072, "hi": 262144, "head": "two_shot_w8192_f8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.6515, "median": 0.6374, "tol": 0.02, "n": 12, "n_measured": 12, "why": "sustained gain over two_shot_w4096_f4 (>= 3% on >= 3 points)"},
+      {"lo": 262144, "hi": 602112, "head": "two_shot_w4096_f4_stagger10g8", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.7407, "median": 0.6897, "tol": 0.02, "n": 16, "n_measured": 16, "why": "sustained gain over two_shot_w8192_f8 (>= 3% on >= 3 points)"},
+      {"lo": 602112, "hi": 860160, "head": "two_shot_w4096_f4_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.735, "median": 0.6883, "tol": 0.02, "n": 9, "n_measured": 9, "why": "sustained gain over two_shot_w4096_f4_stagger10g8 (>= 3% on >= 3 points)"},
+      {"lo": 860160, "hi": 2097152, "head": "two_shot_w8192_f4", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 0.8754, "median": 0.7876, "tol": 0.02, "n": 24, "n_measured": 24, "why": "sustained gain over two_shot_w4096_f4_nopipe (>= 3% on >= 3 points)"},
+      {"lo": 2097152, "hi": 22020096, "head": "two_shot_w2048_f2_nopipe", "floor": "bf16", "stock_arm": "ca", "bound": "request_transaction", "worst": 1.0103, "median": 0.9776, "tol": 0.02, "n": 88, "n_measured": 88, "why": "sustained gain over two_shot_w8192_f4 (>= 3% on >= 3 points)"},
+      {"lo": 22020096, "hi": 134217728, "head": "two_shot_window_w8192", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 1.0013, "median": 0.9708, "tol": 0.02, "n": 128, "n_measured": 128, "why": "bound regime change"},
+      {"lo": 134217728, "hi": 150994944, "head": "stock", "floor": "bf16", "stock_arm": "rccl", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: push at parity only where estimated, not measured (no extrapolation)"},
+      {"lo": 150994944, "hi": 201318400, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 0.8658, "median": 0.8634, "tol": 0.02, "n": 8, "n_measured": 6, "why": "push at parity with the stock path"},
+      {"lo": 201318400, "hi": 201326592, "head": "stock", "floor": "bf16", "stock_arm": "rccl", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 1, "n_measured": 1, "why": "stock: no push arm at parity"},
+      {"lo": 201326592, "hi": 536870912, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 0.8567, "median": 0.8468, "tol": 0.02, "n": 12, "n_measured": 12, "why": "push at parity with the stock path"}
+    ],
+    "qr_int8_bf16_qf/aligned": "qr_off/aligned",
+    "qr_int8_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_int8_bf16_qf/padded": [
+      {"lo": 0, "hi": 37984880, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "ca", "bound": "bandwidth", "worst": 0.9949, "median": 0.9378, "tol": 0.02, "n": 7, "n_measured": 7, "why": "push at parity with the stock path"},
+      {"lo": 37984880, "hi": 117440496, "head": "stock", "floor": "bf16", "stock_arm": "rccl", "bound": "stock", "worst": 1.0, "median": 1.0, "tol": 0.02, "n": 11, "n_measured": 11, "why": "stock: push at parity only on too few points to pay a segment"},
+      {"lo": 117440496, "hi": 536870896, "head": "two_shot_epoch_c12_w4096", "floor": "bf16", "stock_arm": "rccl", "bound": "bandwidth", "worst": 1.0156, "median": 1.0041, "tol": 0.02, "n": 22, "n_measured": 21, "why": "push at parity with the stock path"}
+    ],
+    "qr_int6_bf16_qf/fast": "qr_int8_bf16_qf/fast",
+    "qr_int6_bf16_qf/aligned": "qr_off/aligned",
+    "qr_int6_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_int6_bf16_qf/padded": "qr_int8_bf16_qf/padded",
+    "qr_int4_bf16_qf/fast": "qr_int8_bf16_qf/fast",
+    "qr_int4_bf16_qf/aligned": "qr_off/aligned",
+    "qr_int4_bf16_qf/unaligned": "qr_off/unaligned",
+    "qr_int4_bf16_qf/padded": "qr_int8_bf16_qf/padded"
+  }
+}
