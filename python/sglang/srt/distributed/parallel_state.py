@@ -290,6 +290,7 @@ class GroupCoordinator:
     ca_comm: Optional[Any]  # Custom allreduce communicator
     torch_symm_mem_comm: Optional[Any]  # Torch symm mem communicator
     mq_broadcaster: Optional[Any]  # shared memory broadcaster
+    push_comm: Optional[Any] = None  # --enable-push-comm, TP group only
 
     def __init__(
         self,
@@ -539,6 +540,14 @@ class GroupCoordinator:
                 device=self.device,
             )
 
+        # After the other communicators: it reads their dispatch as its stock path.
+        if _ENABLE_PUSH_COMM and group_name == "tp" and self.world_size > 1:
+            from sglang.srt.distributed.device_communicators.push_comm_setup import (
+                create_push_comm,
+            )
+
+            self.push_comm = create_push_comm(self)
+
         # Create communicator for other hardware backends
         from sglang.srt.distributed.device_communicators.hpu_communicator import (
             HpuCommunicator,
@@ -762,11 +771,15 @@ class GroupCoordinator:
             and not self.ca_comm.disabled
             and self.ca_comm.should_custom_ar(input_)
         )
+        should_use_push_comm = (
+            self.push_comm is not None and self._should_use_push_comm(input_)
+        )
         if (
             self.pynccl_comm is not None
             and self.is_symmetric_memory_enabled()
             and not should_use_pymscclpp_allreduce
             and not should_use_custom_allreduce
+            and not should_use_push_comm
         ):
             self.debug_check_symmetric_mempool(self, {"input": input_}, "all_reduce")
             with self.pynccl_comm.change_state(enable=True):
@@ -779,6 +792,7 @@ class GroupCoordinator:
         outplace_all_reduce_method = self._resolve_outplace_all_reduce_method(
             input_=input_,
             should_use_pymscclpp_allreduce=should_use_pymscclpp_allreduce,
+            should_use_push_comm=should_use_push_comm,
         )
         if outplace_all_reduce_method is not None:
             return outplace_all_reduce(
@@ -946,12 +960,19 @@ class GroupCoordinator:
         self,
         input_: torch.Tensor,
         should_use_pymscclpp_allreduce: Optional[bool] = None,
+        should_use_push_comm: Optional[bool] = None,
     ) -> Optional[str]:
         if should_use_pymscclpp_allreduce is None:
             should_use_pymscclpp_allreduce = (
                 self.pymscclpp_comm is not None
                 and self.pymscclpp_comm.should_mscclpp_allreduce(input_)
             )
+        if should_use_push_comm is None:
+            should_use_push_comm = (
+                self.push_comm is not None and self._should_use_push_comm(input_)
+            )
+        if should_use_push_comm:
+            return "push_comm"
         if (
             self.ca_comm is not None
             and not self.ca_comm.disabled
@@ -987,6 +1008,11 @@ class GroupCoordinator:
             # For piecewise cuda graph, we use pynccl outplace allreduce
             return "pynccl"
         return None
+
+    def _should_use_push_comm(self, input_: torch.Tensor) -> bool:
+        return not is_in_tc_piecewise_cuda_graph() and self.push_comm.should_push_ar(
+            input_
+        )
 
     def _can_use_flashinfer_allreduce(self, input_: torch.Tensor) -> bool:
         if self._fi_workspace_hint is None:
@@ -1032,6 +1058,10 @@ class GroupCoordinator:
                     out = input_.clone()
                     self._all_reduce_in_place(out)
                     return out
+        if outplace_all_reduce_method == "push_comm":
+            out = self.push_comm.all_reduce(input_)
+            assert out is not None
+            return out
         ca_comm = self.ca_comm
         qr_comm = self.qr_comm
         pymscclpp_comm = self.pymscclpp_comm
@@ -2094,6 +2124,9 @@ class GroupCoordinator:
         if self.pcie_ipc_comm is not None:
             self.pcie_ipc_comm.destroy()
             self.pcie_ipc_comm = None
+        if self.push_comm is not None:
+            self.push_comm.close()
+            self.push_comm = None
         if self.device_group is not None:
             torch.distributed.destroy_process_group(self.device_group)
             self.device_group = None
@@ -2335,6 +2368,7 @@ _ENABLE_CUSTOM_ALL_REDUCE = True
 _ENABLE_MSCCLPP = False
 _ENABLE_TORCH_SYMM_MEM_ALL_REDUCE = False
 _ENABLE_FLASHINFER_ALLREDUCE_ONLY = False
+_ENABLE_PUSH_COMM = False
 
 
 def set_custom_all_reduce(enable: bool):
@@ -2350,6 +2384,11 @@ def set_mscclpp(enable: bool):
 def set_torch_symm_mem_all_reduce(enable: bool):
     global _ENABLE_TORCH_SYMM_MEM_ALL_REDUCE
     _ENABLE_TORCH_SYMM_MEM_ALL_REDUCE = enable
+
+
+def set_push_comm(enable: bool):
+    global _ENABLE_PUSH_COMM
+    _ENABLE_PUSH_COMM = enable
 
 
 def set_flashinfer_allreduce_only(enable: bool):
