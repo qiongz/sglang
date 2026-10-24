@@ -21,6 +21,7 @@ from sglang.srt.distributed.parallel_state import (
     set_custom_all_reduce,
     set_flashinfer_allreduce_only,
     set_mscclpp,
+    set_push_comm,
     set_torch_symm_mem_all_reduce,
 )
 from sglang.srt.environ import envs
@@ -252,6 +253,7 @@ def _set_all_reduce_flags() -> None:
     set_custom_all_reduce(not get_exec().comm.disable_custom_all_reduce)
     set_mscclpp(get_exec().comm.enable_mscclpp)
     set_torch_symm_mem_all_reduce(get_exec().comm.enable_torch_symm_mem)
+    set_push_comm(_push_comm_enabled())
     from sglang.srt.layers.flashinfer_comm_fusion import uses_cutedsl_ar_fusion
 
     set_flashinfer_allreduce_only(
@@ -259,6 +261,20 @@ def _set_all_reduce_flags() -> None:
         # cutedsl has no legacy workspace for tagged groups to reduce over.
         and not uses_cutedsl_ar_fusion()
     )
+
+
+def _push_comm_enabled() -> bool:
+    if not get_exec().comm.enable_push_comm:
+        return False
+    from sglang.srt.distributed.device_communicators.push_comm_setup import (
+        push_comm_blockers,
+    )
+
+    blockers = push_comm_blockers()
+    if blockers:
+        logger.warning("--enable-push-comm is ignored with %s", ", ".join(blockers))
+        return False
+    return True
 
 
 def _set_shm_master_env(dist_init_method: Optional[str]) -> None:
