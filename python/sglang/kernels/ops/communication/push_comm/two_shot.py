@@ -5,7 +5,14 @@ all-gather), one launch per call, data as arrival signal.
 Per row: W sender CTAs (one per owner), RED reducer CTAs (256 owned columns
 each), F finisher CTAs, consecutive on the XCD of row % 8 so that every spin
 waits only for smaller CTA ids. 3 slots per row; the senders re-arm the slot of
-call n - 1, which no peer writes again before its call n + 2."""
+call n - 1, which no peer writes again before its call n + 2.
+
+two_shot_norm_kernel fuses the residual add + RMSNorm: each reducer also
+writes its piece's fp32 sum of squares of bf16(AR) + residual into the per-row
+record of every rank (entries reserved for it); the finishers poll the partials
+with their chunks and each wave sums them in a fixed order (the same bits on
+every rank), then stores res_out = bf16(f32(bf16(AR)) + f32(res)) and out =
+bf16(res_out * rstd * w)."""
 
 from __future__ import annotations
 
@@ -101,6 +108,15 @@ def _drain(r, LO: gl.constexpr, N: gl.constexpr, CONS: gl.constexpr):
     )
 
 
+@gluon.jit
+def _launder(x):
+    """An opaque copy: the value is waited for here and is a plain VGPR value
+    afterwards (keeps PIPE's in-flight window around the residual loads)."""
+    return gl.inline_asm_elementwise(
+        "v_mov_b32 $0, $1", "=v,v", [x], dtype=gl.int32, is_pure=False, pack=1
+    )
+
+
 @gluon.jit(do_not_specialize=["site"])
 def two_shot_kernel(
     x_ptr,
@@ -168,6 +184,10 @@ def two_shot_kernel(
             row,
             role,
             0,
+            x_ptr,
+            x_ptr,
+            out_ptr,
+            0.0,
             L0,
             P0,
             P1,
@@ -209,6 +229,129 @@ def two_shot_kernel(
             TRAP,
             TAG,
             0,
+            0,
+        )
+
+
+@gluon.jit(do_not_specialize=["site"])
+def two_shot_norm_kernel(
+    x_ptr,
+    res_ptr,
+    w_ptr,
+    out_ptr,
+    resout_ptr,
+    m,
+    eps,
+    site,
+    L0: gl.constexpr,
+    P0: gl.constexpr,
+    P1: gl.constexpr,
+    P2: gl.constexpr,
+    P3: gl.constexpr,
+    P4: gl.constexpr,
+    P5: gl.constexpr,
+    P6: gl.constexpr,
+    P7: gl.constexpr,
+    CTR: gl.constexpr,
+    ERR: gl.constexpr,
+    ME: gl.constexpr,
+    W: gl.constexpr,
+    H: gl.constexpr,
+    BLK: gl.constexpr,
+    AG_OFF: gl.constexpr,
+    SSQ_OFF: gl.constexpr,
+    MAXR: gl.constexpr,
+    F: gl.constexpr,
+    PIPE: gl.constexpr,
+    RS_ASM: gl.constexpr,
+    RS_CONS: gl.constexpr,
+    RS_NOUT: gl.constexpr,
+    RS_KLO: gl.constexpr,
+    RS_KN: gl.constexpr,
+    RS_KCONS: gl.constexpr,
+    AG_ASM: gl.constexpr,
+    AG_CONS: gl.constexpr,
+    AG_NOUT: gl.constexpr,
+    AG_KLO: gl.constexpr,
+    AG_KN: gl.constexpr,
+    AG_KCONS: gl.constexpr,
+    SDLY: gl.constexpr = 0,
+    SDG: gl.constexpr = 8,
+    DIAG: gl.constexpr = 0,
+    DIAG_BASE: gl.constexpr = 0,
+    INST: gl.constexpr = 0,
+    TRAP: gl.constexpr = 1,
+    TAG: gl.constexpr = 0,
+):
+    """two_shot_kernel with the residual add + RMSNorm; a separate kernel so
+    that its arguments do not change the plain kernel."""
+    OW: gl.constexpr = H // W  # owned columns per rank
+    RED: gl.constexpr = (OW + 255) // 256  # reducer CTAs per row
+    NROLE: gl.constexpr = W + RED + F
+    p = gl.program_id(0)
+    # row r on XCD r % 8, its CTAs consecutive (SEND < REDUCE < FINISH) in
+    # that XCD's id class: every spin waits only for smaller ids
+    xcd = p % 8
+    q = p // 8
+    role = q % NROLE
+    li = q // NROLE
+    # (xcd + 8) % 8 == xcd, but this form compiles to shorter scalar code
+    row = (xcd + 8) % 8 + 8 * li
+    if row < m:
+        _body(
+            x_ptr,
+            out_ptr,
+            m,
+            site,
+            row,
+            role,
+            0,
+            res_ptr,
+            w_ptr,
+            resout_ptr,
+            eps,
+            L0,
+            P0,
+            P1,
+            P2,
+            P3,
+            P4,
+            P5,
+            P6,
+            P7,
+            CTR,
+            ERR,
+            ME,
+            W,
+            H,
+            BLK,
+            AG_OFF,
+            SSQ_OFF,
+            MAXR,
+            F,
+            NROLE,
+            PIPE,
+            RS_ASM,
+            RS_CONS,
+            RS_NOUT,
+            RS_KLO,
+            RS_KN,
+            RS_KCONS,
+            AG_ASM,
+            AG_CONS,
+            AG_NOUT,
+            AG_KLO,
+            AG_KN,
+            AG_KCONS,
+            SDLY,
+            SDG,
+            DIAG,
+            DIAG_BASE,
+            INST,
+            TRAP,
+            TAG,
+            0,
+            1,
         )
 
 
@@ -281,6 +424,10 @@ def two_shot_tail_kernel(
             row,
             role,
             n,
+            x_ptr,
+            x_ptr,
+            out_ptr,
+            0.0,
             L0,
             P0,
             P1,
@@ -322,6 +469,7 @@ def two_shot_tail_kernel(
             TRAP,
             TAG,
             1 + TALN,
+            0,
         )
 
 
@@ -334,6 +482,10 @@ def _body(
     row,
     role,
     n,
+    res_ptr,
+    w_ptr,
+    resout_ptr,
+    eps,
     L0: gl.constexpr,
     P0: gl.constexpr,
     P1: gl.constexpr,
@@ -375,7 +527,9 @@ def _body(
     TRAP: gl.constexpr,
     TAG: gl.constexpr,
     TAIL: gl.constexpr,
+    NORM: gl.constexpr,
 ):
+    gl.static_assert(TAIL == 0 or NORM == 0, "masked tail: plain all-reduce only")
     HID: gl.constexpr = H
     NSEND: gl.constexpr = W  # one sender CTA per owner
     NSLOT: gl.constexpr = 3  # slots per row, re-armed by the senders
@@ -388,6 +542,7 @@ def _body(
     # record: NPART entries reserved for a fused epilogue, then the W call tags
     # (TROOM: in a second 64-entry half)
     TROOM: gl.constexpr = TAG and (NPART + W > 64)
+    gl.static_assert(not TROOM or not NORM, "call tags with 64 partials: plain only")
     SROW: gl.constexpr = (128 if TROOM else 64) if TAG else (32 if NPART <= 32 else 64)
     NC: gl.constexpr = H // 256  # 256-column chunks per row (finishers)
     CPF: gl.constexpr = NC // F  # chunks per finisher
@@ -549,6 +704,21 @@ def _body(
             # a partial piece polls / reads a valid duplicate
             ocr = gl.minimum(k * 256 + cr, OW - 1)
             live = k * 256 + cr < OW
+        if NORM:
+            # this piece's residual, loaded before the spin
+            if WHOLE:
+                rvv = gl.load(
+                    res_ptr.to(gl.pointer_type(gl.int16))
+                    + row * HID
+                    + (k * W + ME) * 256
+                    + cr
+                )
+            else:
+                gcol = ((ocr // BLK) * W + ME) * BLK + ocr % BLK
+                rvv = gl.load(res_ptr.to(gl.pointer_type(gl.int16)) + row * HID + gcol)
+            if PIPE:
+                rvv = _launder(rvv.to(gl.int32)).to(gl.int16)
+            rvf = rvv.to(gl.bfloat16, bitcast=True).to(gl.float32)
         if WHOLE:
             pr = local + ((rowslot * W) * NK + k) * 256 + cr
         else:
@@ -581,6 +751,21 @@ def _body(
                 gl.store(
                     pdst[jj] + AG_OFF + (rowslot * W + ME) * OW + ocr, si, mask=live
                 )
+        if NORM:
+            # the piece's sum of squares of bf16(AR) + residual, to entry
+            # k * W + ME of every rank's record
+            rr = si.to(gl.bfloat16, bitcast=True).to(gl.float32) + rvf
+            if not WHOLE:
+                rr = gl.where(live, rr, gl.zeros_like(rr))
+            ssqb = gl.sum(gl.sum(rr * rr, 1), 0).to(gl.int32, bitcast=True)
+            ssqb = gl.where(ssqb == -2147483648, 0, ssqb)  # never the sentinel
+            for jj in gl.static_range(W):
+                p32 = pdst[jj].to(gl.pointer_type(gl.int32)) + SSQ_OFF
+                gl.store(
+                    p32 + rowslot * SROW + (k * W + ME) + cr * 0,
+                    ssqb + cr * 0,
+                    mask=cr == 0,
+                )
         if PIPE:
             _drain(rp, RS_KLO, RS_KN, RS_KCONS)
     else:
@@ -593,9 +778,15 @@ def _body(
         li = gl.expand_dims(gl.arange(0, 64, layout=gl.SliceLayout(0, LP)), 0)
         ag32 = (local + AG_OFF).to(gl.pointer_type(gl.int32))
         ssq32 = local.to(gl.pointer_type(gl.int32)) + SSQ_OFF
+        r32 = res_ptr.to(gl.pointer_type(gl.int32)) + row * (HID // 2)
+        w32 = w_ptr.to(gl.pointer_type(gl.int32))
         pas = ()
         c2s = ()
         oks = ()
+        rls = ()
+        rhs = ()
+        wls = ()
+        whs = ()
         for i in gl.static_range(NPW):
             if FULLW:
                 b = f * CPF + wi * NPW + i + li * 0
@@ -614,6 +805,17 @@ def _body(
                 ob = (bb // W) * BLK + gc % BLK  # owned position in owner jb's region
                 c2 = gc // 2
                 pa = ((rowslot * W + jb) * OW + ob) // 2
+            if NORM:
+                if PIPE:
+                    rls += (_launder(gl.load(r32 + c2)),)
+                    rhs += (_launder(gl.load(r32 + c2 + 1)),)
+                    wls += (_launder(gl.load(w32 + c2)),)
+                    whs += (_launder(gl.load(w32 + c2 + 1)),)
+                else:
+                    rls += (gl.load(r32 + c2),)
+                    rhs += (gl.load(r32 + c2 + 1),)
+                    wls += (gl.load(w32 + c2),)
+                    whs += (gl.load(w32 + c2 + 1),)
             if FULLW:
                 pas += (ag32 + ((rowslot * W + jb) * NK + kb) * 128 + li * 2,)
             else:
@@ -622,12 +824,12 @@ def _body(
             oks += (ok,)
         if SROW == 32:
             pq0 = ssq32 + rowslot * SROW + (li & 31) + wi * 0
-        elif TAG:
+        elif TAG and not NORM:
             # lane l polls the tag of rank l % W
             pq0 = ssq32 + rowslot * SROW + NPART + li % W + wi * 0
         else:
             pq0 = ssq32 + rowslot * SROW + li + wi * 0
-        NQ: gl.constexpr = 1 if TAG else 0
+        NQ: gl.constexpr = 1 if NORM or TAG else 0
         _adv(ctr, cnt, NSLOT)
         if NQ == 1:
             fp = _spin(pas + (pq0,), AG_NOUT, AG_ASM, AG_CONS)
@@ -661,7 +863,45 @@ def _body(
             ds = nds
             qv0 = nan_if_failed(qv0, itf)
         o32 = out_ptr.to(gl.pointer_type(gl.int32)) + row * (HID // 2)
-        if TAIL == 2:
+        if NORM:
+            # every wave polled all the partials and sums them itself (fixed
+            # order): no LDS, no barrier between the spin and the stores
+            if TAG:
+                qf = gl.where(
+                    li < NPART,
+                    qv0.to(gl.float32, bitcast=True),
+                    gl.zeros([4, 64], gl.float32, LP),
+                )
+            elif SROW == 32:
+                qf = gl.where(
+                    li < 32,
+                    qv0.to(gl.float32, bitcast=True),
+                    gl.zeros([4, 64], gl.float32, LP),
+                )
+            else:
+                qf = qv0.to(gl.float32, bitcast=True)
+            inv = gl.expand_dims(gl.rsqrt(gl.sum(qf, 1) / HID + eps), 1)
+            ro32 = resout_ptr.to(gl.pointer_type(gl.int32)) + row * (HID // 2)
+            for i in gl.static_range(NPW):
+                lo = ds[2 * i]
+                hi = ds[2 * i + 1]
+                q0 = _bf_lo(lo) + _bf_lo(rls[i])
+                q1 = _bf_hi(lo) + _bf_hi(rls[i])
+                q2 = _bf_lo(hi) + _bf_lo(rhs[i])
+                q3 = _bf_hi(hi) + _bf_hi(rhs[i])
+                o0 = _pack2(q0 * inv * _bf_lo(wls[i]), q1 * inv * _bf_hi(wls[i]))
+                o1 = _pack2(q2 * inv * _bf_lo(whs[i]), q3 * inv * _bf_hi(whs[i]))
+                if FULLW:
+                    gl.store(ro32 + c2s[i], _pack2(q0, q1))
+                    gl.store(ro32 + c2s[i] + 1, _pack2(q2, q3))
+                    gl.store(o32 + c2s[i], o0)
+                    gl.store(o32 + c2s[i] + 1, o1)
+                else:
+                    gl.store(ro32 + c2s[i], _pack2(q0, q1), mask=oks[i])
+                    gl.store(ro32 + c2s[i] + 1, _pack2(q2, q3), mask=oks[i])
+                    gl.store(o32 + c2s[i], o0, mask=oks[i])
+                    gl.store(o32 + c2s[i] + 1, o1, mask=oks[i])
+        elif TAIL == 2:
             # n % 4 == 0: a lane's 4 columns are all below n or all past it,
             # so its two words go out as one 8-byte store
             nr = n - row * HID
@@ -758,13 +998,13 @@ _FIXED = dict(RA=1, NSLOT=3)
 NSLOT, CPAD, PSLP = 3, 32, 4
 
 
-def spin_kw(world, npw, cfg, bound=None, abort=None, tag=False):
+def spin_kw(world, npw, cfg, bound=None, abort=None, tag=False, norm=False):
     """The RS / AG spin constexprs ({RS,AG}_{ASM, CONS, NOUT, KLO, KN,
     KCONS}) of one geometry."""
     out = {}
     pipe = cfg["PIPE"]
     rs = ("rs_pipe", dict(nsrc=world, pslp=PSLP)) if pipe else ("rs", dict(nsrc=world))
-    nq = 1 if tag else 0
+    nq = 1 if tag or norm else 0  # the AG spin polls the record
     ag = (
         ("ag_pipe", dict(n=npw, nq=nq, pslp=PSLP))
         if pipe
@@ -834,6 +1074,7 @@ def m_classes(lo, hi):
 
 
 _FL = FastLauncher(two_shot_kernel)
+_FL_NORM = FastLauncher(two_shot_norm_kernel)
 _FL_TAIL = FastLauncher(two_shot_tail_kernel)
 _KEYS = itertools.count(1)
 
@@ -907,8 +1148,14 @@ class TwoShotInst(PushInst):
         self.addrs = [int(a) for a in self.buf.addrs] + [0] * (8 - world)
         abort = None if diag is None else diag.abort
         self._asm = spin_kw(world, self.npw, c, self.spin, abort, self.tag)
+        self._asm_norm = spin_kw(
+            world, self.npw, c, self.spin, abort, self.tag, norm=True
+        )
+        # with call tags, 64 partials per row leave the tags no room the norm
+        # does not need: the norm is not served there
+        self.can_norm = not (self.tag and s["TROOM"])
 
-    def _kw(self):
+    def _kw(self, norm=False):
         a, c, s = self.addrs, self.cfg, self.s
         kw = dict(
             L0=a[self.rank],
@@ -931,7 +1178,7 @@ class TwoShotInst(PushInst):
             MAXR=self.max_tokens,
             F=c["F"],
             PIPE=c["PIPE"],
-            **self._asm,
+            **(self._asm_norm if norm else self._asm),
         )
         if c["SDLY"]:
             kw.update(SDLY=c["SDLY"], SDG=c["SDG"])
@@ -951,12 +1198,30 @@ class TwoShotInst(PushInst):
             return _FL.warm(grid, args, self._kw, key=(self._key, "ar"), fast=self.fast)
         _FL(grid, args, self._kw, key=(self._key, "ar"), fast=self.fast)
 
-    def precompile(self, x, ms=(1,), tail=False):
-        """Compile every row-count class of ms (and the masked tails) without
-        launching."""
+    def _launch_norm(self, x, res, w, eps, out, res_out, warmup=False, m=None):
+        if m is None:
+            m = x.shape[0]
+        grid = (8 * cdiv(m, 8) * self.nrole,)
+        args = (x, res, w, out, res_out, m, eps, self.site_box[0])
+
+        def kw():
+            return self._kw(True)
+
+        if warmup:
+            return _FL_NORM.warm(
+                grid, args, kw, key=(self._key, "norm"), fast=self.fast
+            )
+        _FL_NORM(grid, args, kw, key=(self._key, "norm"), fast=self.fast)
+
+    def precompile(self, x, ms=(1,), tail=False, norm=False):
+        """Compile every row-count class of ms (and the masked tails; norm: the
+        residual add + RMSNorm kernel) without launching."""
         out = torch.empty_like(x)
         for mm in sorted({m_class_rep(v) for v in ms}):
             self._launch(x, out, warmup=True, m=mm)
+            if norm:
+                w = torch.ones(self.hidden, dtype=x.dtype, device=x.device)
+                self._launch_norm(x, x, w, 1e-6, out, out, warmup=True, m=mm)
             if tail:  # both tail forms: TALN (n % 4 == 0) and the general one
                 for nn in (x.numel(), x.numel() - 1):
                     self._launch_tail(x.view(-1), out.view(-1), nn, warmup=True, m=mm)
@@ -1009,3 +1274,11 @@ class TwoShotInst(PushInst):
             return out
 
         return run
+
+    def ar_add_rmsnorm(self, x, res, w, eps):
+        """(out, res_out) of the all-reduce of x [m, H] + the residual add +
+        RMSNorm with weight w [H] (bf16, contiguous)."""
+        assert self.can_norm
+        o2 = torch.empty((2,) + tuple(x.shape), dtype=x.dtype, device=x.device)
+        self._launch_norm(x, res, w, float(eps), o2[0], o2[1])
+        return o2[0], o2[1]

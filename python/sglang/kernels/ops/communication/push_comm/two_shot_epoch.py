@@ -5,7 +5,10 @@ epoch flag per segment (stored after a publish fence), for large messages.
 Wires: c12 (12-bit lossless codec) and xe8 (lossy, 9 bits / value; the
 int8 tier). Schedules: grid (one CTA per (role, position)) or
 persistent channels. A sender writes generation gen of a window slot only after
-this rank's finishers released gen - 1, and every wait is on a smaller CTA id."""
+this rank's finishers released gen - 1, and every wait is on a smaller CTA id.
+two_shot_epoch_norm_kernel fuses the residual add + RMSNorm into the finishers
+(lossless wire): res_out = bf16(f32(bf16(AR)) + f32(res)), out = bf16(res_out *
+rstd * w), the row's sum of squares reduced in a fixed order."""
 
 from __future__ import annotations
 
@@ -151,6 +154,117 @@ def _nan_fail(
         is_pure=False,
         pack=1,
     )
+
+
+@constexpr_function
+def _nan_asm_norm(rf, w4):
+    """_nan_asm over the output ($7) and the residual output ($8) of the rows
+    $9 .. $9 + rf - 1 (< $10)."""
+    rf, w4 = (int(a.value if isinstance(a, gl.constexpr) else a) for a in (rf, w4))
+    return "\n".join(
+        [
+            f"v_cmp_le_u32 vcc, {FAILED:#x}, $6",
+            "s_cbranch_vccz 5f",
+            "v_mov_b32 $0, 0x7fc07fc0",
+            "v_mbcnt_lo_u32_b32 $2, -1, 0",
+            "v_mbcnt_hi_u32_b32 $2, -1, $2",
+            "v_lshlrev_b32 $2, 2, $2",
+            "s_mov_b32 $3, $9",
+            "2:",
+            "s_cmp_ge_i32 $3, $10",
+            "s_cbranch_scc1 5f",
+            "s_sub_u32 $4, $3, $9",
+            f"s_cmp_ge_u32 $4, {rf}",
+            "s_cbranch_scc1 5f",
+            f"s_mul_i32 $4, $3, {w4}",
+            "v_add_u32 $1, $4, $2",
+            f"s_mov_b32 $5, {w4}",
+            "3:",
+            "global_store_dword $1, $0, $7",
+            "global_store_dword $1, $0, $8",
+            "v_add_u32 $1, 256, $1",
+            "s_sub_u32 $5, $5, 256",
+            "s_cmp_eq_u32 $5, 0",
+            "s_cbranch_scc0 3b",
+            "s_add_u32 $3, $3, 1",
+            "s_branch 2b",
+            "5:",
+        ]
+    )
+
+
+@gluon.jit
+def _nan_fail_norm(
+    itr,
+    out_ptr,
+    resout_ptr,
+    r0,
+    m,
+    RF: gl.constexpr,
+    HID: gl.constexpr,
+):
+    """_nan_fail over the output and the residual output."""
+    ASM: gl.constexpr = _nan_asm_norm(RF, HID * 2)
+    gl.inline_asm_elementwise(
+        ASM,
+        "=&v,=&v,=&v,=&s,=&s,=&s,v,s,s,s,s,~{vcc},~{memory}",
+        [
+            itr,
+            out_ptr.to(gl.int64, bitcast=True),
+            resout_ptr.to(gl.int64, bitcast=True),
+            r0,
+            m,
+        ],
+        dtype=(gl.int32,) * 6,
+        is_pure=False,
+        pack=1,
+    )
+
+
+@gluon.jit
+def _norm_store(
+    vals,
+    rts,
+    wts,
+    cols,
+    oks,
+    rout,
+    rro,
+    eps,
+    ri2,
+    u2,
+    q3,
+    S2: gl.constexpr,
+    NSEG: gl.constexpr,
+    KK: gl.constexpr,
+    HID: gl.constexpr,
+):
+    """One row's res_out and out; the squares summed over the [8, 32] tile in
+    a fixed order."""
+    sq = gl.zeros([8, 32], gl.float32, S2)
+    rrs = ()
+    for kk in gl.static_range(KK):
+        rt = rts[kk]
+        okk = (kk * 8 + ri2 < NSEG) & (u2 >= 0)
+        for qq in gl.static_range(4):
+            rp = _pair(rt, q3, qq)
+            lo = vals[kk * 8 + qq * 2] + _lo(rp)
+            hi = vals[kk * 8 + qq * 2 + 1] + _hi(rp)
+            sq = sq + gl.where(okk, lo * lo + hi * hi, gl.zeros_like(lo))
+            rrs += (lo, hi)
+    inv = gl.rsqrt(gl.sum(gl.sum(sq, axis=1), axis=0) / HID + eps)
+    for kk in gl.static_range(KK):
+        wt = wts[kk]
+        o4 = ()
+        r4 = ()
+        for qq in gl.static_range(4):
+            wp = _pair(wt, q3, qq)
+            lo = rrs[kk * 8 + qq * 2]
+            hi = rrs[kk * 8 + qq * 2 + 1]
+            o4 += (_pk(lo * inv * _lo(wp), hi * inv * _hi(wp)),)
+            r4 += (_pk(lo, hi),)
+        gl.store(rro + cols[kk], _quad(r4[0], r4[1], r4[2], r4[3], q3), mask=oks[kk])
+        gl.store(rout + cols[kk], _quad(o4[0], o4[1], o4[2], o4[3], q3), mask=oks[kk])
 
 
 @gluon.jit
@@ -372,8 +486,14 @@ def _epoch_pos(
     TRAP: gl.constexpr,
     TAG: gl.constexpr,
     RBAR: gl.constexpr = 0,
+    NORM: gl.constexpr = 0,
+    res_ptr=0,
+    w_ptr=0,
+    resout_ptr=0,
+    eps=0.0,
 ):
-    """One position (8 rows) of one role. TAG: a reducer forwards a foreign tag
+    """One position (8 rows) of one role. NORM: the finishers add the residual
+    and apply the RMSNorm (_norm_store). TAG: a reducer forwards a foreign tag
     poisoned; a finisher that reads one fails its wave (SEQ_MISMATCH)."""
     HID: gl.constexpr = HIDDEN
     SG: gl.constexpr = SEGS + (WIRE == 10) * (SEGS_XE8 - SEGS + TAG * TAGW)
@@ -621,18 +741,45 @@ def _epoch_pos(
                         _rbf(v6),
                         _rbf(v7),
                     )
-                for kk in gl.static_range(KK):
-                    gl.store(
-                        rout + cols[kk],
-                        _quad(
-                            _pk(vals[kk * 8], vals[kk * 8 + 1]),
-                            _pk(vals[kk * 8 + 2], vals[kk * 8 + 3]),
-                            _pk(vals[kk * 8 + 4], vals[kk * 8 + 5]),
-                            _pk(vals[kk * 8 + 6], vals[kk * 8 + 7]),
-                            q3,
-                        ),
-                        mask=oks[kk],
+                if NORM:
+                    rres = res_ptr.to(gl.pointer_type(gl.int32)) + row * (HID // 2)
+                    w32 = w_ptr.to(gl.pointer_type(gl.int32))
+                    rro = resout_ptr.to(gl.pointer_type(gl.int32)) + row * (HID // 2)
+                    rts = ()
+                    wts = ()
+                    for kk in gl.static_range(KK):
+                        rts += (gl.load(rres + cols[kk]),)
+                        wts += (gl.load(w32 + cols[kk]),)
+                    _norm_store(
+                        vals,
+                        rts,
+                        wts,
+                        cols,
+                        oks,
+                        rout,
+                        rro,
+                        eps,
+                        ri2,
+                        u2,
+                        q3,
+                        S2,
+                        NSEG,
+                        KK,
+                        HID,
                     )
+                else:
+                    for kk in gl.static_range(KK):
+                        gl.store(
+                            rout + cols[kk],
+                            _quad(
+                                _pk(vals[kk * 8], vals[kk * 8 + 1]),
+                                _pk(vals[kk * 8 + 2], vals[kk * 8 + 3]),
+                                _pk(vals[kk * 8 + 4], vals[kk * 8 + 5]),
+                                _pk(vals[kk * 8 + 6], vals[kk * 8 + 7]),
+                                q3,
+                            ),
+                            mask=oks[kk],
+                        )
         if TAG:  # a foreign tag fails the wave like a failed wait
             st = gl.maximum(
                 gl.convert_layout(gl.reshape(itr, [8, 32]), S2),
@@ -651,9 +798,15 @@ def _epoch_pos(
                 cnt,
                 TRAP,
             )
-            _nan_fail(st, out_ptr, row0 + fi * RF, m, RF, HID)
+            if NORM:
+                _nan_fail_norm(st, out_ptr, resout_ptr, row0 + fi * RF, m, RF, HID)
+            else:
+                _nan_fail(st, out_ptr, row0 + fi * RF, m, RF, HID)
         elif DIAG:  # a failed wave: NaN over this finisher's rows
-            _nan_fail(itr, out_ptr, row0 + fi * RF, m, RF, HID)
+            if NORM:
+                _nan_fail_norm(itr, out_ptr, resout_ptr, row0 + fi * RF, m, RF, HID)
+            else:
+                _nan_fail(itr, out_ptr, row0 + fi * RF, m, RF, HID)
         # release (local): this rank has consumed generation gen of position b
         # (the fence drains the loads)
         d = _fence(role)
@@ -791,6 +944,145 @@ def two_shot_epoch_kernel(
         )
 
 
+@gluon.jit(do_not_specialize=["m", "site"])
+def two_shot_epoch_norm_kernel(
+    x_ptr,
+    res_ptr,
+    w_ptr,
+    out_ptr,
+    resout_ptr,
+    ptrs,
+    ctr_ptr,
+    err_ptr,
+    m,
+    eps,
+    site,
+    ME: gl.constexpr,
+    NRANK: gl.constexpr,
+    P: gl.constexpr,
+    AG_OFF: gl.constexpr,
+    RSF_OFF: gl.constexpr,
+    AGF_OFF: gl.constexpr,
+    REL_OFF: gl.constexpr,
+    NSEND: gl.constexpr,
+    RED: gl.constexpr,
+    F: gl.constexpr,
+    WIRE: gl.constexpr = 1,
+    HIDDEN: gl.constexpr = 6144,
+    PERSIST: gl.constexpr = 0,
+    DRAIN: gl.constexpr = 1,
+    XS: gl.constexpr = 0,
+    SPIN_EQ: gl.constexpr = _EQ[0],
+    SPIN_GE: gl.constexpr = _GE[0],
+    DIAG: gl.constexpr = 0,
+    DIAG_BASE: gl.constexpr = 0,
+    INST: gl.constexpr = 0,
+    TRAP: gl.constexpr = 1,
+    TAG: gl.constexpr = 0,
+):
+    """two_shot_epoch_kernel with the residual add + RMSNorm; a separate kernel
+    so that its arguments do not change the plain kernel."""
+    role = gl.program_id(0)
+    if PERSIST:
+        NR: gl.constexpr = NSEND + RED + F
+        c0 = gl.program_id(1)
+        if XS == 2:
+            # workgroup L runs on XCD L % 8; its first NPC * NSEND / 8 CTAs are
+            # sender role x % NSEND, the rest reducers / finishers
+            L = gl.program_id(0) + NR * gl.program_id(1)
+            x = L % 8
+            i = L // 8
+            SP = (gl.num_programs(1) * NSEND) // 8
+            j = (i - SP) * 8 + x
+            role = gl.where(i < SP, x % NSEND, NSEND + j % (NR - NSEND))
+            c0 = gl.where(i < SP, (x // NSEND) * SP + i, j // (NR - NSEND))
+        pv = ()  # peer bases, loaded once per CTA
+        for i in gl.static_range(NRANK):
+            pv += (gl.load(ptrs + i).to(gl.int64),)
+        npos = (m + 7) // 8
+        kch = gl.num_programs(1)
+        for pos in range(c0, npos, kch):
+            _epoch_pos(
+                pos,
+                role,
+                x_ptr,
+                out_ptr,
+                ptrs,
+                pv,
+                ctr_ptr,
+                err_ptr,
+                m,
+                site,
+                ME,
+                NRANK,
+                P,
+                AG_OFF,
+                RSF_OFF,
+                AGF_OFF,
+                REL_OFF,
+                NSEND,
+                RED,
+                F,
+                WIRE,
+                HIDDEN,
+                PERSIST,
+                DRAIN,
+                SPIN_EQ,
+                SPIN_GE,
+                DIAG,
+                DIAG_BASE,
+                INST,
+                TRAP,
+                TAG,
+                0,
+                1,
+                res_ptr,
+                w_ptr,
+                resout_ptr,
+                eps,
+            )
+    else:
+        _epoch_pos(
+            gl.program_id(1),
+            role,
+            x_ptr,
+            out_ptr,
+            ptrs,
+            ptrs,
+            ctr_ptr,
+            err_ptr,
+            m,
+            site,
+            ME,
+            NRANK,
+            P,
+            AG_OFF,
+            RSF_OFF,
+            AGF_OFF,
+            REL_OFF,
+            NSEND,
+            RED,
+            F,
+            WIRE,
+            HIDDEN,
+            PERSIST,
+            DRAIN,
+            SPIN_EQ,
+            SPIN_GE,
+            DIAG,
+            DIAG_BASE,
+            INST,
+            TRAP,
+            TAG,
+            0,
+            1,
+            res_ptr,
+            w_ptr,
+            resout_ptr,
+            eps,
+        )
+
+
 # ------------------------------------------------------------------ host side
 F_ROLES = 8  # finisher CTAs per position
 
@@ -860,6 +1152,7 @@ def ctas_per_cu(asm, shared, arch, num_warps=NW):
 
 
 _FL = FastLauncher(two_shot_epoch_kernel)
+_FL_NORM = FastLauncher(two_shot_epoch_norm_kernel)
 _KEYS = itertools.count(1)
 
 
@@ -941,6 +1234,8 @@ class TwoShotEpochInst(PushInst):
         self.wire = WIRES[wire]
         # xe8 at TP8: a load barrier per source in the reducer (occupancy)
         self.rbar = 1 if (self.wire == 10 and world == 8) else 0
+        # the residual add + RMSNorm: lossless wire only (so never with RBAR)
+        self.can_norm = wire == "c12"
         self.site_box = site_box if site_box is not None else [0]
         assert ctr.numel() >= self.P * self.nrole and err.numel() >= 1
         self.ctr, self.err = ctr[: self.P * self.nrole], err[:1]
@@ -975,25 +1270,51 @@ class TwoShotEpochInst(PushInst):
     def _args(self, x, out, m):
         return (x, out, self.buf.ptrs, self.ctr, self.err, m, self.site_box[0])
 
-    def _chan_limit(self, x, xs):
+    def _args_norm(self, x, res, w, out, res_out, m, eps):
+        b = self.buf
+        return (
+            x,
+            res,
+            w,
+            out,
+            res_out,
+            b.ptrs,
+            self.ctr,
+            self.err,
+            m,
+            eps,
+            self.site_box[0],
+        )
+
+    def _chan_limit(self, x, xs, norm=False):
         """Max CTAs of a persistent launch, from the compiled kernel: min(2 x
         CUs, half the co-resident capacity), so every channel stays resident
         with other work on half of the device."""
-        lim = self._limit.get(xs)
+        lim = self._limit.get((xs, norm))
         if lim is not None:
             return lim
-        ck = _FL.warm(
-            (self.nrole, 1),
-            self._args(x, x, x.shape[0]),
-            self._kw(1, (1, xs)),
-            key=(self._key, xs),
-            fast=self.fast,
-        )
+        if norm:
+            w = torch.ones(self.hidden, dtype=x.dtype, device=x.device)
+            ck = _FL_NORM.warm(
+                (self.nrole, 1),
+                self._args_norm(x, x, w, x, x, x.shape[0], 1e-6),
+                self._kw(1, (1, xs)),
+                key=(self._key, "norm", xs),
+                fast=self.fast,
+            )
+        else:
+            ck = _FL.warm(
+                (self.nrole, 1),
+                self._args(x, x, x.shape[0]),
+                self._kw(1, (1, xs)),
+                key=(self._key, xs),
+                fast=self.fast,
+            )
         props = torch.cuda.get_device_properties(x.device)
         ncu = props.multi_processor_count
         per_cu = ctas_per_cu(ck.asm["amdgcn"], ck.metadata.shared, props.gcnArchName)
         lim = min(SAFE_CTAS_PER_CU * ncu, ncu * per_cu // 2)
-        self._limit[xs] = lim
+        self._limit[(xs, norm)] = lim
         return lim
 
     def _xs2(self, spec):
@@ -1005,17 +1326,17 @@ class TwoShotEpochInst(PushInst):
                 return (kk, 2)
         return (k, 0)
 
-    def _eff(self, m, x):
+    def _eff(self, m, x, norm=False):
         """(spec or None, grid) of a call with m rows, the persistent spec
         clamped to the co-residency limit (below one channel per role: the
         grid schedule; logged once)."""
-        hit = self._eff_cache.get(m)
+        hit = self._eff_cache.get((m, norm))
         if hit is not None:
             return hit
         npos = (m + R - 1) // R
         spec = None if self.npc is None else (self.npc, self.xs)
         if spec is not None:
-            lim = self._chan_limit(x, spec[1])
+            lim = self._chan_limit(x, spec[1], norm)
             if self.nrole * spec[0] > lim:
                 k = lim // self.nrole
                 if (k, spec) not in self._warned:
@@ -1035,7 +1356,7 @@ class TwoShotEpochInst(PushInst):
         else:
             # XS = 2 maps roles from the grid: always the full (NROLE, K) grid
             out = (spec, (self.nrole, spec[0] if spec[1] == 2 else min(spec[0], npos)))
-        self._eff_cache[m] = out
+        self._eff_cache[(m, norm)] = out
         return out
 
     def _launch(self, x, out, warmup=False, spec="auto"):
@@ -1060,6 +1381,28 @@ class TwoShotEpochInst(PushInst):
             fast=self.fast,
         )
 
+    def _launch_norm(self, x, res, w, eps, out, res_out, warmup=False, spec="auto"):
+        m = x.shape[0]
+        args = self._args_norm(x, res, w, out, res_out, m, eps)
+        if warmup:  # compile the given spec (None = grid) without launching
+            if spec == "auto":
+                spec = self._eff(m, x, True)[0]
+            return _FL_NORM.warm(
+                (self.nrole, 1),
+                args,
+                self._kw(int(spec is not None), spec),
+                key=(self._key, "norm", None if spec is None else spec[1]),
+                fast=self.fast,
+            )
+        spec, grid = self._eff(m, x, True)
+        _FL_NORM(
+            grid,
+            args,
+            lambda: self._kw(int(spec is not None), spec),
+            key=(self._key, "norm", None if spec is None else spec[1]),
+            fast=self.fast,
+        )
+
     def specs(self):
         """The schedule spec of this instance (None = grid)."""
         if self.npc is None:
@@ -1067,15 +1410,33 @@ class TwoShotEpochInst(PushInst):
         sp = (self.npc, self.xs)
         return {self._xs2(sp) if self.xs == 2 else sp}
 
-    def precompile(self, x, ms=None):
+    def precompile(self, x, ms=None, norm=False):
         """Compile the schedule's variant, and the grid / clamped variant a
-        co-residency clamp may use, without launching."""
+        co-residency clamp may use, without launching (norm: also those of the
+        residual add + RMSNorm kernel)."""
         out = torch.empty_like(x)
-        for sp in self.specs():
-            self._launch(x, out, warmup=True, spec=sp)
-            if sp is not None:
-                lim = self._chan_limit(x, sp[1])
-                if self.nrole * sp[0] > lim:
-                    u = (lim // self.nrole, sp[1])
-                    if u[0] >= 1:
-                        self._launch(x, out, warmup=True, spec=u)
+        w = torch.ones(self.hidden, dtype=x.dtype, device=x.device)
+        for nm in (False, True) if norm and self.can_norm else (False,):
+
+            def warm(sp, nm=nm):
+                if nm:
+                    self._launch_norm(x, x, w, 1e-6, out, out, warmup=True, spec=sp)
+                else:
+                    self._launch(x, out, warmup=True, spec=sp)
+
+            for sp in self.specs():
+                warm(sp)
+                if sp is not None:
+                    lim = self._chan_limit(x, sp[1], nm)
+                    if self.nrole * sp[0] > lim:
+                        u = (lim // self.nrole, sp[1])
+                        if u[0] >= 1:
+                            warm(u)
+
+    def ar_add_rmsnorm(self, x, res, w, eps):
+        """(out, res_out) of the all-reduce of x [m, H] + the residual add +
+        RMSNorm with weight w [H] (bf16, contiguous)."""
+        assert self.can_norm
+        o2 = torch.empty((2,) + tuple(x.shape), dtype=x.dtype, device=x.device)
+        self._launch_norm(x, res, w, float(eps), o2[0], o2[1])
+        return o2[0], o2[1]

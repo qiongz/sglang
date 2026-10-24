@@ -4,7 +4,10 @@
 NSEND sender CTAs per row push every chunk of the row to every peer's slot
 [row][src]; one finisher CTA per row polls all peers' chunks in one spin and
 sums in rank order. 3 slots per row: in call n the finisher re-arms the slot of
-call n - 1, which no peer writes again before its call n + 2."""
+call n - 1, which no peer writes again before its call n + 2.
+one_shot_norm_kernel fuses the residual add + RMSNorm: the finisher holds the
+whole row, so it stores res_out = bf16(f32(bf16(AR)) + f32(res)) and out =
+bf16(res_out * rstd * w), the squares summed over its 4 waves."""
 
 from __future__ import annotations
 
@@ -60,6 +63,10 @@ def one_shot_kernel(
         m,
         0,
         0,
+        x_ptr,
+        x_ptr,
+        out_ptr,
+        0.0,
         L0,
         P0,
         P1,
@@ -83,6 +90,7 @@ def one_shot_kernel(
         DIAG_BASE,
         INST,
         TRAP,
+        0,
         0,
         0,
     )
@@ -128,6 +136,10 @@ def one_shot_tag_kernel(
         m,
         site,
         0,
+        x_ptr,
+        x_ptr,
+        out_ptr,
+        0.0,
         L0,
         P0,
         P1,
@@ -153,6 +165,84 @@ def one_shot_tag_kernel(
         TRAP,
         TAG,
         0,
+        0,
+    )
+
+
+@gluon.jit(do_not_specialize=["site"])
+def one_shot_norm_kernel(
+    x_ptr,
+    res_ptr,
+    w_ptr,
+    out_ptr,
+    resout_ptr,
+    m,
+    eps,
+    site,
+    L0: gl.constexpr,
+    P0: gl.constexpr,
+    P1: gl.constexpr,
+    P2: gl.constexpr,
+    P3: gl.constexpr,
+    P4: gl.constexpr,
+    P5: gl.constexpr,
+    P6: gl.constexpr,
+    P7: gl.constexpr,
+    CTR: gl.constexpr,
+    ERR: gl.constexpr,
+    ME: gl.constexpr,
+    W: gl.constexpr,
+    H: gl.constexpr,
+    MAXR: gl.constexpr,
+    NSEND: gl.constexpr,
+    FS_ASM: gl.constexpr,
+    FS_CONS: gl.constexpr,
+    FS_NOUT: gl.constexpr,
+    DIAG: gl.constexpr = 0,
+    DIAG_BASE: gl.constexpr = 0,
+    INST: gl.constexpr = 0,
+    TRAP: gl.constexpr = 1,
+    TAG: gl.constexpr = 0,
+):
+    """one_shot_kernel with the residual add + RMSNorm (TAG 1: + the call
+    tags); a separate kernel so that its arguments do not change the plain
+    kernel."""
+    _one_shot(
+        x_ptr,
+        out_ptr,
+        m,
+        site,
+        0,
+        res_ptr,
+        w_ptr,
+        resout_ptr,
+        eps,
+        L0,
+        P0,
+        P1,
+        P2,
+        P3,
+        P4,
+        P5,
+        P6,
+        P7,
+        CTR,
+        ERR,
+        ME,
+        W,
+        H,
+        MAXR,
+        NSEND,
+        FS_ASM,
+        FS_CONS,
+        FS_NOUT,
+        DIAG,
+        DIAG_BASE,
+        INST,
+        TRAP,
+        TAG,
+        0,
+        1,
     )
 
 
@@ -196,6 +286,10 @@ def one_shot_tail_kernel(
         m,
         0,
         n,
+        x_ptr,
+        x_ptr,
+        out_ptr,
+        0.0,
         L0,
         P0,
         P1,
@@ -221,6 +315,7 @@ def one_shot_tail_kernel(
         TRAP,
         0,
         1 + TALN,
+        0,
     )
 
 
@@ -266,6 +361,10 @@ def one_shot_tail_tag_kernel(
         m,
         site,
         n,
+        x_ptr,
+        x_ptr,
+        out_ptr,
+        0.0,
         L0,
         P0,
         P1,
@@ -291,6 +390,7 @@ def one_shot_tail_tag_kernel(
         TRAP,
         TAG,
         1 + TALN,
+        0,
     )
 
 
@@ -301,6 +401,10 @@ def _one_shot(
     m,
     site,
     n,
+    res_ptr,
+    w_ptr,
+    resout_ptr,
+    eps,
     L0: gl.constexpr,
     P0: gl.constexpr,
     P1: gl.constexpr,
@@ -326,7 +430,9 @@ def _one_shot(
     TRAP: gl.constexpr,
     TAG: gl.constexpr,
     TAIL: gl.constexpr,
+    NORM: gl.constexpr,
 ):
+    gl.static_assert(TAIL == 0 or NORM == 0, "masked tail: plain all-reduce only")
 
     NROLE: gl.constexpr = NSEND + 1
     CPAD: gl.constexpr = 32  # counter words per (row, role) cell
@@ -427,10 +533,14 @@ def _one_shot(
             li = gl.expand_dims(gl.arange(0, 64, layout=gl.SliceLayout(0, LP)), 0)
             l32 = local.to(gl.pointer_type(gl.int32))
             x32 = x_ptr.to(gl.pointer_type(gl.int32)) + row * (H // 2)
+            r32 = res_ptr.to(gl.pointer_type(gl.int32)) + row * (H // 2)
+            w32 = w_ptr.to(gl.pointer_type(gl.int32))
             rmslot = ((slot + 2) % 3) * MAXR + row
             c2s = ()
             oks = ()
             own = ()
+            rls = ()
+            wls = ()
             pas = ()
             for i in gl.static_range(NPW):
                 ci = wi + 4 * i + li * 0
@@ -463,6 +573,9 @@ def _one_shot(
                         own += (v | v0,)
                 else:
                     own += (gl.load(x32 + c2), gl.load(x32 + c2 + 1))
+                if NORM:
+                    rls += (gl.load(r32 + c2), gl.load(r32 + c2 + 1))
+                    wls += (gl.load(w32 + c2), gl.load(w32 + c2 + 1))
                 for jj in gl.static_range(W):
                     if jj != ME:
                         # re-arm call n - 1's slot of this source / chunk
@@ -496,6 +609,7 @@ def _one_shot(
                 diag_report(DIAG_BASE, itf, wi + li, INST, 1, ME, role, row, cnt, TRAP)
             o32 = out_ptr.to(gl.pointer_type(gl.int32)) + row * (H // 2)
             ars = ()
+            ss = gl.zeros([4, 64], gl.float32, LP)
             for i in gl.static_range(NPW):
                 for h in gl.static_range(2):
                     lo = gl.zeros([4, 64], gl.float32, LP)
@@ -516,7 +630,31 @@ def _one_shot(
                     pk = gl.where((pk & 65535) == 32768, pk & -65536, pk)
                     pk = gl.where((pk & -65536) == -2147483648, pk & 65535, pk)
                     ars += (pk,)
-            if TAIL == 2:  # n % 4 == 0: whole 4-column groups, 8-byte stores
+            if NORM:
+                # res_out, the row's sum of squares over the 4 waves, out
+                xrs = ()
+                for i in gl.static_range(NPW):
+                    for h in gl.static_range(2):
+                        a = ars[2 * i + h]
+                        r = rls[2 * i + h]
+                        q0 = _bf_lo(a) + _bf_lo(r)
+                        q1 = _bf_hi(a) + _bf_hi(r)
+                        xrs += (q0, q1)
+                        ss = ss + gl.where(oks[i], q0 * q0 + q1 * q1, gl.zeros_like(q0))
+                inv = gl.rsqrt(gl.sum(gl.sum(ss, 1), 0) / H + eps)
+                ro32 = resout_ptr.to(gl.pointer_type(gl.int32)) + row * (H // 2)
+                for i in gl.static_range(NPW):
+                    for h in gl.static_range(2):
+                        q0 = xrs[2 * (2 * i + h)]
+                        q1 = xrs[2 * (2 * i + h) + 1]
+                        wv = wls[2 * i + h]
+                        gl.store(ro32 + c2s[i] + h, _pack2(q0, q1), mask=oks[i])
+                        gl.store(
+                            o32 + c2s[i] + h,
+                            _pack2(q0 * inv * _bf_lo(wv), q1 * inv * _bf_hi(wv)),
+                            mask=oks[i],
+                        )
+            elif TAIL == 2:  # n % 4 == 0: whole 4-column groups, 8-byte stores
                 nr = n - row * H
                 for i in gl.static_range(NPW):
                     ok4 = oks[i] & (2 * c2s[i] + 4 <= nr)
@@ -569,6 +707,15 @@ def _one_shot(
                 for i in gl.static_range(NPW):
                     for h in gl.static_range(2):
                         store_nan_if_failed(o32 + c2s[i] + h, itf, oks[i])
+                        if NORM:
+                            store_nan_if_failed(
+                                resout_ptr.to(gl.pointer_type(gl.int32))
+                                + row * (H // 2)
+                                + c2s[i]
+                                + h,
+                                itf,
+                                oks[i],
+                            )
 
 
 # ---------------------------------------------------------------- host side
@@ -589,6 +736,7 @@ def ipc_bytes(world, hidden, max_tokens, tag=False, **_geom):
 
 _FL = FastLauncher(one_shot_kernel)
 _FL_TAG = FastLauncher(one_shot_tag_kernel)
+_FL_NORM = FastLauncher(one_shot_norm_kernel)
 _FL_TAIL = FastLauncher(one_shot_tail_kernel)
 _FL_TAIL_TAG = FastLauncher(one_shot_tail_tag_kernel)
 _KEYS = itertools.count(1)
@@ -703,12 +851,28 @@ class OneShotInst(PushInst):
             return fl.warm(grid, args, self._kw, key=(self._key, "ar"), fast=self.fast)
         fl(grid, args, self._kw, key=(self._key, "ar"), fast=self.fast)
 
-    def precompile(self, x, ms=(1,), tail=False):
+    can_norm = True  # the residual add + RMSNorm kernel, every form
+
+    def _launch_norm(self, x, res, w, eps, out, res_out, warmup=False, m=None):
+        m = x.shape[0] if m is None else m
+        grid = (8 * cdiv(m, 8) * self.nrole,)
+        args = (x, res, w, out, res_out, m, eps, self.site_box[0])
+        if warmup:
+            return _FL_NORM.warm(
+                grid, args, self._kw, key=(self._key, "norm"), fast=self.fast
+            )
+        _FL_NORM(grid, args, self._kw, key=(self._key, "norm"), fast=self.fast)
+
+    def precompile(self, x, ms=(1,), tail=False, norm=False):
         """Compile every row-count specialization class of ms without
-        launching; tail: also the masked-tail kernel."""
+        launching; tail: also the masked-tail kernel; norm: also the residual
+        add + RMSNorm kernel."""
         out = torch.empty_like(x)
         for mm in sorted({m_class_rep(v) for v in ms}):
             self._launch(x, out, warmup=True, m=mm)
+            if norm:
+                w = torch.ones(self.hidden, dtype=x.dtype, device=x.device)
+                self._launch_norm(x, x, w, 1e-6, out, out, warmup=True, m=mm)
             if tail:  # both tail forms: TALN (n % 4 == 0) and the general one
                 for nn in (x.numel(), x.numel() - 1):
                     self._launch_tail(x.view(-1), out.view(-1), nn, warmup=True, m=mm)
@@ -784,3 +948,10 @@ class OneShotInst(PushInst):
             return out
 
         return run
+
+    def ar_add_rmsnorm(self, x, res, w, eps):
+        """(out, res_out) of the all-reduce of x [m, H] + the residual add +
+        RMSNorm with weight w [H] (bf16, contiguous)."""
+        o2 = torch.empty((2,) + tuple(x.shape), dtype=x.dtype, device=x.device)
+        self._launch_norm(x, res, w, float(eps), o2[0], o2[1])
+        return o2[0], o2[1]
